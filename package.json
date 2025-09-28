@@ -1,0 +1,33 @@
+{
+  "name": "thermal-print-service",
+  "version": "1.0.0",
+  "description": "Servicio local para impresión térmica multiplataforma",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test-print": "node test-print.js",
+    "test-chars": "node test-caracteres.js",
+    "test-euro": "node test-euro-tildes.js",
+    "test-comparativo": "node test-comparativo.js",
+    "test-iconv": "node test-iconv.js",
+    "check": "node check-installation.js"
+  },
+  "dependencies": {
+    "@node-escpos/core": "^0.6.0",
+    "@node-escpos/usb-adapter": "^0.3.1",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "iconv-lite": "^0.7.0",
+    "node-thermal-printer": "^4.5.0"
+  },
+  "keywords": [
+    "thermal",
+    "printer",
+    "escpos",
+    "receipt",
+    "pos"
+  ],
+  "author": "IronType",
+  "license": "MIT"
+}

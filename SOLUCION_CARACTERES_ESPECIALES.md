@@ -6,23 +6,30 @@ Se implementó la **Solución #1** usando `iconv-lite` para convertir correctame
 
 ### Cambios principales
 
-1. **Nueva función `encodeTextForPrinter()`** (línea 198)
-   - Convierte texto UTF-8 → CP858 (o cualquier encoding)
+1. **Nueva función `normalizeUnicodeForCP858()`** (línea 22)
+   - Convierte caracteres Unicode que NO existen en CP858 a equivalentes ASCII
+   - Ejemplo: `•` → `*`, `✓` → `OK`, `━` → `=`
+   - CP858 solo tiene 256 caracteres (sin emojis ni Unicode avanzado)
+
+2. **Nueva función `encodeTextForPrinter()`** (línea 65)
+   - Normaliza Unicode primero (paso 1)
+   - Convierte texto UTF-8 → CP858 con iconv-lite (paso 2)
    - Retorna Buffers binarios en lugar de strings
    - Tiene fallback automático a conversión manual si falla
 
-2. **`printWithLpr()` mejorado** (línea 227)
+3. **`printWithLpr()` mejorado**
    - Usa buffers binarios en lugar de strings
    - Prueba múltiples encodings: CP858, CP850, ISO-8859-15, Windows-1252
    - Escribe archivos .bin en lugar de .txt
    - Configura correctamente la página de códigos con ESC/POS
 
-3. **`printDirectToDevice()` mejorado** (línea 118)
+4. **`printDirectToDevice()` mejorado**
    - Usa buffers binarios con CP858
    - Comandos ESC/POS como bytes hexadecimales
 
-4. **Nuevo test `test-iconv.js`**
+5. **Nuevo test `test-iconv.js`**
    - Prueba completa de caracteres especiales (€, á, é, í, ó, ú, ñ, ¡, ¿)
+   - Ahora también prueba normalización de Unicode (•, ✓, ━)
    - Script: `npm run test-iconv`
 
 ## 🧪 Cómo probar
@@ -52,6 +59,9 @@ Busca estos caracteres en el ticket:
 - ✅ **á, é, í, ó, ú** → con tildes
 - ✅ **ñ** → eñe española
 - ✅ **¡, ¿** → signos de interrogación/exclamación españoles
+- ✅ **\*** → asteriscos (antes `•` bullets)
+- ✅ **=** → líneas horizontales (antes `━`)
+- ✅ **OK** → checkmarks (antes `✓`)
 
 ## 📊 Encodings probados (en orden)
 
@@ -62,6 +72,28 @@ El sistema intentará estas codificaciones automáticamente:
 3. **ISO-8859-15** (Latin-9 con €)
 4. **Windows-1252** (Windows Latin)
 5. **ASCII manual** (fallback seguro)
+
+## 📋 Tabla de normalización Unicode
+
+Caracteres que NO existen en CP858 se convierten automáticamente:
+
+| Original | Conversión | Tipo |
+|----------|------------|------|
+| `•` `●` `∙` | `*` | Bullets |
+| `✓` `✔` | `OK` | Checkmark |
+| `✅` | `[OK]` | Emoji check |
+| `✗` `✘` | `X` | Cross |
+| `❌` | `[X]` | Emoji cross |
+| `─` `═` `━` | `=` | Líneas horizontales |
+| `│` `║` `┃` | `\|` | Líneas verticales |
+| `┌` `┐` `└` `┘` | `+` | Esquinas |
+| `"` `"` | `"` | Smart quotes |
+| `'` `'` | `'` | Smart apostrophes |
+| `…` | `...` | Ellipsis |
+| `→` | `->` | Flechas |
+| `🧪` `✨` `🎉` | `[TEST]` `*` `!` | Emojis |
+
+**Consejo**: Para tickets profesionales, usa solo caracteres ASCII + € + tildes españolas.
 
 ## 🔧 Qué hace diferente esta solución
 
@@ -74,9 +106,14 @@ printer.print(text) // ❌ La impresora no entiende UTF-8
 
 ### AHORA (correcto)
 ```javascript
-// Convierte UTF-8 → CP858 como bytes
-const buffer = iconv.encode("Precio: 15.50€", 'CP858')
-// buffer = [0x50, 0x72, 0x65, ..., 0xD5] // 0xD5 es € en CP858
+// Paso 1: Normalizar Unicode
+const normalized = normalizeUnicodeForCP858("• Precio: 15.50€")
+// normalized = "* Precio: 15.50€"
+
+// Paso 2: Convertir UTF-8 → CP858 como bytes
+const buffer = iconv.encode(normalized, 'CP858')
+// buffer = [0x2A, 0x20, ..., 0xD5] // 0xD5 es € en CP858
+
 printer.print(buffer) // ✅ La impresora entiende CP858
 ```
 

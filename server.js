@@ -19,16 +19,62 @@ app.use(express.json())
 // HELPER FUNCTIONS - Funciones auxiliares de codificación
 // ============================================================================
 
+// Normalizar caracteres Unicode que NO existen en CP858
+// CP858 solo tiene 256 caracteres (ASCII + Europa), sin emojis ni Unicode avanzado
+function normalizeUnicodeForCP858(text) {
+  return text
+    // Box drawing / Líneas decorativas
+    .replace(/[─═━]/g, '=')   // Líneas horizontales → igual
+    .replace(/[│║┃]/g, '|')   // Líneas verticales → pipe
+    .replace(/[┌┐└┘├┤┬┴┼]/g, '+')  // Esquinas → plus
+
+    // Bullets / Viñetas
+    .replace(/[•●∙◦]/g, '*')  // Bullets → asterisco
+    .replace(/[▪▫]/g, '-')    // Cuadrados → guión
+
+    // Checkmarks / Marcas
+    .replace(/[✓✔]/g, 'OK')   // Check simple → OK
+    .replace(/[✅]/g, '[OK]')  // Emoji check → [OK]
+    .replace(/[✗✘]/g, 'X')    // Cross → X
+    .replace(/[❌]/g, '[X]')   // Emoji cross → [X]
+
+    // Emojis comunes
+    .replace(/[🧪]/g, '[TEST]')
+    .replace(/[✨]/g, '*')
+    .replace(/[🎉]/g, '!')
+    .replace(/[⚠️]/g, '!')
+    .replace(/[🔧]/g, '[CONFIG]')
+    .replace(/[📄]/g, '[DOC]')
+
+    // Quotes / Comillas
+    .replace(/[""]/g, '"')    // Smart quotes → comillas normales
+    .replace(/['']/g, "'")    // Smart apostrophes
+    .replace(/[«»]/g, '"')    // Comillas angulares
+
+    // Otros símbolos
+    .replace(/[…]/g, '...')   // Ellipsis
+    .replace(/[—–]/g, '-')    // Em dash, en dash → guión
+
+    // Flechas
+    .replace(/[→⇒➜➔]/g, '->')
+    .replace(/[←⇐]/g, '<-')
+    .replace(/[↑]/g, '^')
+    .replace(/[↓]/g, 'v')
+}
+
 // Función MEJORADA: Convertir texto UTF-8 → CP858 con iconv-lite
 function encodeTextForPrinter(text, encoding = 'CP858') {
   try {
-    // Convertir UTF-8 → CP858 (incluye € y tildes españolas)
-    const buffer = iconv.encode(text, encoding)
+    // Paso 1: Normalizar caracteres Unicode que no existen en CP858
+    const normalizedText = normalizeUnicodeForCP858(text)
+
+    // Paso 2: Convertir UTF-8 → CP858 (incluye € y tildes españolas)
+    const buffer = iconv.encode(normalizedText, encoding)
     return { buffer, success: true, encoding }
   } catch (error) {
     console.log(`⚠️  Error codificando con ${encoding}:`, error.message)
     // Fallback: convertir manualmente
-    const fallbackText = text
+    const fallbackText = normalizeUnicodeForCP858(text)
       .replace(/€/g, 'EUR')
       .replace(/[áàäâ]/g, 'a')
       .replace(/[éèëê]/g, 'e')

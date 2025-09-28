@@ -14,29 +14,31 @@ const testData = {
   text: `PRUEBA ICONV-LITE
 ${new Date().toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })}
 
-✨ TEST CARACTERES ESPECIALES ✨
+* TEST CARACTERES ESPECIALES *
 
 Cliente: José María Pérez
 Dirección: C/ Corazón de María, 15
 Teléfono: +34 91 234 56 78
 
 Productos:
-• Piñón de embrague     15.50€
-• Aceite motor 5W-40    28.90€
-• Batería 12V           89.95€
+* Piñón de embrague     15.50€
+* Aceite motor 5W-40    28.90€
+* Batería 12V           89.95€
 
 Subtotal:              134.35€
 IVA (21%):              28.21€
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+================================
 TOTAL:                 162.56€
 
 ¡Gracias! ¿Alguna duda?
 
 ESPERADO:
-✓ € → símbolo de euro
-✓ á,é,í,ó,ú → con tildes
-✓ ñ → eñe española
-✓ ¡,¿ → signos españoles`
+[OK] € -> símbolo de euro
+[OK] á,é,í,ó,ú -> con tildes
+[OK] ñ -> eñe española
+[OK] ¡,¿ -> signos españoles
+[OK] * -> bullets (antes •)
+[OK] = -> líneas (antes ━)`
 }
 
 const postData = JSON.stringify(testData)

@@ -47,8 +47,29 @@ async function printWithThermalPrinter(text) {
   printer.clear()
   printer.alignLeft()
   const lines = cleanText.split('\n')
+
   lines.forEach(line => {
-    if (line.trim()) {
+    // Detectar marcadores de formato
+    if (line.includes('[LARGE]') && line.includes('[BOLD]')) {
+      const cleanLine = line.replace(/\[LARGE\]|\[\/LARGE\]|\[BOLD\]|\[\/BOLD\]/g, '').trim()
+      printer.bold(true)
+      printer.setTextDoubleHeight()
+      printer.setTextDoubleWidth()
+      printer.println(cleanLine)
+      printer.setTextNormal()
+      printer.bold(false)
+    } else if (line.includes('[LARGE]')) {
+      const cleanLine = line.replace(/\[LARGE\]|\[\/LARGE\]/g, '').trim()
+      printer.setTextDoubleHeight()
+      printer.setTextDoubleWidth()
+      printer.println(cleanLine)
+      printer.setTextNormal()
+    } else if (line.includes('[BOLD]')) {
+      const cleanLine = line.replace(/\[BOLD\]|\[\/BOLD\]/g, '').trim()
+      printer.bold(true)
+      printer.println(cleanLine)
+      printer.bold(false)
+    } else if (line.trim()) {
       printer.println(line.trim())
     } else {
       printer.newLine()

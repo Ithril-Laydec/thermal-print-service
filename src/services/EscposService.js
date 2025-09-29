@@ -27,15 +27,28 @@ async function printWithNodeEscpos(text) {
           })
         })
 
-        printer
-          .font('a')
-          .align('lt')
-          .style('normal')
-          .size(1, 1)
-          .text(text)
-          .text('')
-          .text('')
-          .cut()
+        // Procesar el texto línea por línea con marcadores de formato
+        const lines = text.split('\n')
+
+        printer.font('a').align('lt')
+
+        for (const line of lines) {
+          // Detectar marcadores de formato
+          if (line.includes('[LARGE]') && line.includes('[BOLD]')) {
+            const cleanLine = line.replace(/\[LARGE\]|\[\/LARGE\]|\[BOLD\]|\[\/BOLD\]/g, '')
+            printer.style('bold').size(2, 2).text(cleanLine).style('normal').size(1, 1)
+          } else if (line.includes('[LARGE]')) {
+            const cleanLine = line.replace(/\[LARGE\]|\[\/LARGE\]/g, '')
+            printer.size(2, 2).text(cleanLine).size(1, 1)
+          } else if (line.includes('[BOLD]')) {
+            const cleanLine = line.replace(/\[BOLD\]|\[\/BOLD\]/g, '')
+            printer.style('bold').text(cleanLine).style('normal')
+          } else {
+            printer.text(line)
+          }
+        }
+
+        printer.text('').text('').cut()
 
         await new Promise((resolve, reject) => {
           printer.close((error) => {

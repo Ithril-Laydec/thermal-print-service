@@ -118,7 +118,8 @@ else
 fi
 
 echo ""
-read -p "¿Deseas continuar? (s/n) " -n 1 -r
+# Usar /dev/tty para leer del terminal real, no del pipe
+read -p "¿Deseas continuar? (s/n) " -n 1 -r < /dev/tty
 echo
 if [[ ! $REPLY =~ ^[Ss]$ ]]; then
   echo "Operación cancelada"
@@ -169,7 +170,7 @@ else
     if [ "$SERVICE_RUNNING" = false ]; then
       echo -e "${YELLOW}⚠️  El servicio no está corriendo${NC}"
       echo ""
-      read -p "¿Deseas iniciar el servicio? (s/n) " -n 1 -r
+      read -p "¿Deseas iniciar el servicio? (s/n) " -n 1 -r < /dev/tty
       echo
       if [[ $REPLY =~ ^[Ss]$ ]]; then
         if [ "$INSTALLATION_TYPE" = "system" ] || [ "$INSTALLATION_TYPE" = "systemd" ]; then

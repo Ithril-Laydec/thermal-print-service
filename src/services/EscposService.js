@@ -29,13 +29,9 @@ async function printWithNodeEscpos(text) {
 
         printer
           .font('a')
-          .align('ct')
-          .style('bu')
-          .size(1, 1)
-          .text('=== TICKET ===')
-          .text('')
           .align('lt')
           .style('normal')
+          .size(1, 1)
           .text(text)
           .text('')
           .text('')

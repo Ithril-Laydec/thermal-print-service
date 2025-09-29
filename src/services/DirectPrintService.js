@@ -8,12 +8,10 @@ async function printDirectToDevice(text) {
   const fs = require('fs').promises
   const encoded = encodeTextForPrinter(text, 'CP858')
 
-  const header = Buffer.from([0x1B, 0x40, 0x1B, 0x74, 0x13, 0x1B, 0x61, 0x01, 0x1B, 0x45, 0x01])
-  const titleBuffer = iconv.encode('=== TICKET ===\n', 'CP858')
-  const formatBuffer = Buffer.from([0x1B, 0x45, 0x00, 0x1B, 0x61, 0x00, 0x0A])
+  const header = Buffer.from([0x1B, 0x40, 0x1B, 0x74, 0x13, 0x1B, 0x61, 0x00])
   const footer = Buffer.from([0x0A, 0x0A, 0x1D, 0x56, 0x00])
 
-  const escPosBuffer = Buffer.concat([header, titleBuffer, formatBuffer, encoded.buffer, footer])
+  const escPosBuffer = Buffer.concat([header, encoded.buffer, footer])
   const devices = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/lp0', '/dev/lp1']
 
   for (const device of devices) {

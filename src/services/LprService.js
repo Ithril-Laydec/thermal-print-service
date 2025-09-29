@@ -38,17 +38,11 @@ async function printWithLpr(text) {
     if (attempt.useCodePage) {
       header.push(0x1B, 0x74, attempt.useCodePage.charCodeAt(0))
     }
-    header.push(0x1B, 0x61, 0x01)
-    header.push(0x1B, 0x45, 0x01)
-
-    const titleBuffer = iconv.encode('=== TICKET ===\n', attempt.encoding)
-    const formatBuffer = Buffer.from([0x1B, 0x45, 0x00, 0x1B, 0x61, 0x00, 0x0A])
+    header.push(0x1B, 0x61, 0x00)
     const footer = Buffer.from([0x0A, 0x0A, 0x1B, 0x64, 0x03, 0x1D, 0x56, 0x41, 0x03])
 
     const escPosBuffer = Buffer.concat([
       Buffer.from(header),
-      titleBuffer,
-      formatBuffer,
       textBuffer,
       footer
     ])

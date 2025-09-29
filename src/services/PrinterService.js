@@ -45,12 +45,6 @@ async function printWithThermalPrinter(text) {
   const cleanText = fixSpecialCharacters(text)
 
   printer.clear()
-  printer.alignCenter()
-  printer.bold(true)
-  printer.println('=== TICKET ===')
-  printer.bold(false)
-  printer.newLine()
-
   printer.alignLeft()
   const lines = cleanText.split('\n')
   lines.forEach(line => {

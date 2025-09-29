@@ -18,12 +18,12 @@ fi
 
 INSTALL_DIR="/opt/thermal-print-service"
 SERVICE_FILE="/etc/systemd/system/thermal-print.service"
-DOWNLOAD_URL="${THERMAL_SERVICE_URL:-https://github.com/Ithril-Laydec/thermal-print-service/archive/refs/tags/v1.0.0.tar.gz}"
+GITHUB_REPO="https://github.com/Ithril-Laydec/thermal-print-service.git"
 
 echo "📋 Configuración:"
 echo "   Directorio: $INSTALL_DIR"
 echo "   Usuario: $USER"
-echo "   URL: $DOWNLOAD_URL"
+echo "   Repositorio: $GITHUB_REPO"
 echo ""
 
 read -p "¿Continuar con la instalación? (s/n) " -n 1 -r < /dev/tty
@@ -61,29 +61,34 @@ sudo usermod -a -G lp $USER
 echo "✅ Usuario añadido al grupo lp"
 
 echo ""
+echo "🔍 Verificando git..."
+if ! command -v git &> /dev/null; then
+    echo "📦 Instalando git..."
+    sudo apt update
+    sudo apt install -y git
+    echo "✅ Git instalado"
+else
+    echo "✅ Git ya está instalado"
+fi
+
+echo ""
 echo "📥 Descargando servicio de impresión..."
 TEMP_DIR=$(mktemp -d)
 cd $TEMP_DIR
 
-if [[ $DOWNLOAD_URL == http* ]]; then
-    curl -L -o thermal-print-service.tar.gz "$DOWNLOAD_URL"
-    tar -xzf thermal-print-service.tar.gz
-    SERVICE_DIR=$(find . -maxdepth 1 -type d -name "thermal-print-service*" | head -n 1)
-else
-    echo "⚠️  URL no proporcionada. Usando instalación local..."
-    SERVICE_DIR="."
+# Clonar el repositorio
+git clone --depth 1 $GITHUB_REPO thermal-print-service
+if [ $? -ne 0 ]; then
+    echo "❌ Error descargando el repositorio"
+    exit 1
 fi
 
 echo ""
 echo "📦 Instalando en $INSTALL_DIR..."
 sudo mkdir -p $INSTALL_DIR
 
-if [[ -d "$SERVICE_DIR" ]] && [[ "$SERVICE_DIR" != "." ]]; then
-    sudo cp -r $SERVICE_DIR/* $INSTALL_DIR/
-else
-    echo "❌ Error: No se encontró el directorio del servicio"
-    exit 1
-fi
+# Copiar archivos al directorio de instalación
+sudo cp -r thermal-print-service/* $INSTALL_DIR/
 
 sudo chown -R $USER:$USER $INSTALL_DIR
 

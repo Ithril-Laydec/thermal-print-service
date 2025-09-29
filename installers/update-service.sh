@@ -17,7 +17,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 INSTALL_DIR="/opt/thermal-print-service"
-DOWNLOAD_URL="${THERMAL_SERVICE_URL:-https://github.com/Ithril-Laydec/thermal-print-service/archive/refs/tags/latest.tar.gz}"
+GITHUB_REPO="https://github.com/Ithril-Laydec/thermal-print-service.git"
 
 if [[ ! -d "$INSTALL_DIR" ]]; then
     echo "❌ El servicio no está instalado en $INSTALL_DIR"
@@ -52,12 +52,10 @@ echo "📥 Descargando nueva versión..."
 TEMP_DIR=$(mktemp -d)
 cd $TEMP_DIR
 
-if [[ $DOWNLOAD_URL == http* ]]; then
-    curl -L -o thermal-print-service.tar.gz "$DOWNLOAD_URL"
-    tar -xzf thermal-print-service.tar.gz
-    SERVICE_DIR=$(find . -maxdepth 1 -type d -name "thermal-print-service*" | head -n 1)
-else
-    echo "❌ URL de descarga no válida"
+# Clonar la última versión del repositorio
+git clone --depth 1 $GITHUB_REPO thermal-print-service
+if [ $? -ne 0 ]; then
+    echo "❌ Error descargando el repositorio"
     echo "🔄 Restaurando backup..."
     sudo systemctl start thermal-print.service
     exit 1
@@ -65,17 +63,22 @@ fi
 
 echo ""
 echo "📦 Actualizando archivos..."
-if [[ -d "$SERVICE_DIR" ]]; then
-    sudo cp -r $SERVICE_DIR/* $INSTALL_DIR/
-    sudo chown -R $USER:$USER $INSTALL_DIR
-else
-    echo "❌ Error: No se encontró el directorio del servicio"
-    echo "🔄 Restaurando backup..."
-    sudo rm -rf $INSTALL_DIR
-    sudo cp -r $BACKUP_DIR $INSTALL_DIR
-    sudo systemctl start thermal-print.service
-    exit 1
+# Limpiar directorio actual (excepto node_modules si existe)
+if [ -d "$INSTALL_DIR/node_modules" ]; then
+    sudo mv $INSTALL_DIR/node_modules /tmp/node_modules_backup
 fi
+
+sudo rm -rf $INSTALL_DIR/*
+
+# Copiar nuevos archivos
+sudo cp -r thermal-print-service/* $INSTALL_DIR/
+
+# Restaurar node_modules si existía
+if [ -d "/tmp/node_modules_backup" ]; then
+    sudo mv /tmp/node_modules_backup $INSTALL_DIR/node_modules
+fi
+
+sudo chown -R $USER:$USER $INSTALL_DIR
 
 echo ""
 echo "📦 Actualizando dependencias..."

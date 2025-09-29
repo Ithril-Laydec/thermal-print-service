@@ -26,7 +26,7 @@ echo "   Usuario: $USER"
 echo "   URL: $DOWNLOAD_URL"
 echo ""
 
-read -p "¿Continuar con la instalación? (s/n) " -n 1 -r
+read -p "¿Continuar con la instalación? (s/n) " -n 1 -r < /dev/tty
 echo
 if [[ ! $REPLY =~ ^[Ss]$ ]]; then
     echo "Instalación cancelada"

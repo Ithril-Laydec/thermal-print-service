@@ -30,7 +30,7 @@ CURRENT_VERSION=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '
 echo "📦 Versión actual: $CURRENT_VERSION"
 
 echo ""
-read -p "¿Continuar con la actualización? (s/n) " -n 1 -r
+read -p "¿Continuar con la actualización? (s/n) " -n 1 -r < /dev/tty
 echo
 if [[ ! $REPLY =~ ^[Ss]$ ]]; then
     echo "Actualización cancelada"

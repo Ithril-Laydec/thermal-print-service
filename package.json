@@ -1,6 +1,6 @@
 {
   "name": "thermal-print-service",
-  "version": "0.3",
+  "version": "0.4.0",
   "description": "Servicio local para impresión térmica multiplataforma con auto-instalación",
   "main": "server.js",
   "scripts": {

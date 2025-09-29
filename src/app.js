@@ -5,7 +5,7 @@ const cors = require('cors')
 const { getHealth, getVersion } = require('./controllers/healthController')
 const { getStatus, setServiceStartTime } = require('./controllers/statusController')
 const { printTicket } = require('./controllers/printController')
-const { getPrinters, getDiagnostics } = require('./controllers/printerController')
+const { getPrinters, getDiagnostics, checkPrinterAvailability } = require('./controllers/printerController')
 
 // Configuration
 const { PORT, HOST } = require('./config/config')
@@ -25,6 +25,7 @@ app.get('/version', getVersion)
 app.get('/status', getStatus)
 app.post('/print/ticket', printTicket)
 app.get('/printers', getPrinters)
+app.get('/printer/check', checkPrinterAvailability)
 app.get('/diagnostics', getDiagnostics)
 
 module.exports = { app, PORT, HOST }

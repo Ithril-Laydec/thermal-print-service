@@ -1,6 +1,7 @@
 const { app, PORT, HOST } = require('./app')
 const AutoSetup = require('./services/auto-setup')
 const { detectThermalPrinters } = require('./utils/system')
+const { checkForUpdates } = require('./utils/update-checker')
 const packageJson = require('../package.json')
 
 async function startServer() {
@@ -33,11 +34,27 @@ async function startServer() {
   await detectThermalPrinters()
 
   // 4. Iniciar servidor
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log('')
     console.log('✅ Servicio de impresión térmica LISTO')
     console.log(`📡 Servidor ejecutándose en http://${HOST}:${PORT}`)
     console.log(`📦 Versión: ${packageJson.version}`)
+
+    // 5. Verificar actualizaciones
+    try {
+      const updateInfo = await checkForUpdates()
+      if (updateInfo.updateAvailable) {
+        console.log('')
+        console.log('🔔 ACTUALIZACIÓN DISPONIBLE!')
+        console.log(`   Versión actual: ${updateInfo.currentVersion}`)
+        console.log(`   Nueva versión: ${updateInfo.latestVersion}`)
+        console.log(`   Actualiza con: git pull && npm install && npm start`)
+        console.log('')
+      }
+    } catch (error) {
+      // Silently fail update check
+    }
+
     console.log(`🔧 Endpoints disponibles:`)
     console.log(`   POST /print/ticket  - Imprimir ticket`)
     console.log(`   GET  /health        - Estado del servicio`)

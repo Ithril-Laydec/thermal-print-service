@@ -1,5 +1,6 @@
 const packageJson = require('../../package.json')
 const { getSystemInfo, detectThermalPrinters, getConfiguredPrinters } = require('../utils/system')
+const { checkForUpdates } = require('../utils/update-checker')
 
 let serviceStartTime = Date.now()
 
@@ -20,8 +21,12 @@ async function getStatus(req, res) {
     const detection = await detectThermalPrinters()
     const printersConfigured = await getConfiguredPrinters()
 
+    // Check for updates (cached, non-blocking)
+    const updateInfo = await checkForUpdates()
+
     res.json({
       version: packageJson.version,
+      updateInfo: updateInfo,
       uptime: uptime,
       platform: systemInfo.platform,
       arch: systemInfo.arch,

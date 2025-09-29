@@ -1,17 +1,17 @@
 {
   "name": "thermal-print-service",
   "version": "1.0.0",
-  "description": "Servicio local para impresión térmica multiplataforma",
+  "description": "Servicio local para impresión térmica multiplataforma con auto-instalación",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test-print": "node test-print.js",
-    "test-chars": "node test-caracteres.js",
-    "test-euro": "node test-euro-tildes.js",
-    "test-comparativo": "node test-comparativo.js",
-    "test-iconv": "node test-iconv.js",
-    "check": "node check-installation.js"
+    "test-print": "node tests/test-print.js",
+    "test-chars": "node tests/test-caracteres.js",
+    "test-euro": "node tests/test-euro-tildes.js",
+    "test-comparativo": "node tests/test-comparativo.js",
+    "test-iconv": "node tests/test-iconv.js",
+    "check": "node tests/check-installation.js"
   },
   "dependencies": {
     "@node-escpos/core": "^0.6.0",

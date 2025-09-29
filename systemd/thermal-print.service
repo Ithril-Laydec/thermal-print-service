@@ -1,0 +1,24 @@
+[Unit]
+Description=Thermal Print Service
+Documentation=https://github.com/tu-org/thermal-print-service
+After=network.target cups.service
+Wants=cups.service
+
+[Service]
+Type=simple
+User=%USER%
+Group=%USER%
+WorkingDirectory=/opt/thermal-print-service
+ExecStart=/usr/bin/node /opt/thermal-print-service/server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=thermal-print
+
+Environment=NODE_ENV=production
+Environment=PORT=20936
+Environment=HOST=localhost
+
+[Install]
+WantedBy=multi-user.target

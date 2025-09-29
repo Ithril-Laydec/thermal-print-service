@@ -1,0 +1,73 @@
+# Dependencias
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos temporales
+tmp_*
+*.tmp
+*.temp
+*.bin
+.DS_Store
+Thumbs.db
+
+# Archivos de entorno (si llegas a usarlos)
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Archivos de configuración del IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+
+# Archivos específicos del sistema operativo
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Backups
+*.backup
+*.bak
+backup/
+
+# Archivos de prueba temporales
+test-output/
+coverage/
+
+# Certificados y claves (por si acaso)
+*.key
+*.cert
+*.crt
+*.pem
+*.p12
+
+# Archivos específicos del proyecto
+tmp_ticket.bin
+bun.lock
+
+# Git (no necesario incluir en .gitignore)
+# .git/
+
+# Otros archivos que no deseas rastrear
+ANTES*.md

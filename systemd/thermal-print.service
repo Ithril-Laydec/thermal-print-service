@@ -1,6 +1,6 @@
 [Unit]
 Description=Thermal Print Service
-Documentation=https://github.com/tu-org/thermal-print-service
+Documentation=https://github.com/Ithril-Laydec/thermal-print-service
 After=network.target cups.service
 Wants=cups.service
 

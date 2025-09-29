@@ -18,7 +18,7 @@ fi
 
 INSTALL_DIR="/opt/thermal-print-service"
 SERVICE_FILE="/etc/systemd/system/thermal-print.service"
-DOWNLOAD_URL="${THERMAL_SERVICE_URL:-https://github.com/tu-org/thermal-print-service/archive/refs/tags/v1.0.0.tar.gz}"
+DOWNLOAD_URL="${THERMAL_SERVICE_URL:-https://github.com/Ithril-Laydec/thermal-print-service/archive/refs/tags/v1.0.0.tar.gz}"
 
 echo "📋 Configuración:"
 echo "   Directorio: $INSTALL_DIR"
@@ -97,7 +97,7 @@ echo "🔧 Configurando servicio systemd..."
 sudo tee $SERVICE_FILE > /dev/null <<EOF
 [Unit]
 Description=Thermal Print Service
-Documentation=https://github.com/tu-org/thermal-print-service
+Documentation=https://github.com/Ithril-Laydec/thermal-print-service
 After=network.target cups.service
 
 [Service]

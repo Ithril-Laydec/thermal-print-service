@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 $INSTALL_DIR = "C:\Program Files\ThermalPrintService"
 $SERVICE_NAME = "ThermalPrintService"
-$DOWNLOAD_URL = if ($env:THERMAL_SERVICE_URL) { $env:THERMAL_SERVICE_URL } else { "https://github.com/tu-org/thermal-print-service/archive/refs/tags/v1.0.0.zip" }
+$DOWNLOAD_URL = if ($env:THERMAL_SERVICE_URL) { $env:THERMAL_SERVICE_URL } else { "https://github.com/Ithril-Laydec/thermal-print-service/archive/refs/tags/v1.0.0.zip" }
 
 Write-Host "📋 Configuración:" -ForegroundColor Yellow
 Write-Host "   Directorio: $INSTALL_DIR"

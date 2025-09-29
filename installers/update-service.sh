@@ -17,7 +17,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 INSTALL_DIR="/opt/thermal-print-service"
-DOWNLOAD_URL="${THERMAL_SERVICE_URL:-https://github.com/tu-org/thermal-print-service/archive/refs/tags/latest.tar.gz}"
+DOWNLOAD_URL="${THERMAL_SERVICE_URL:-https://github.com/Ithril-Laydec/thermal-print-service/archive/refs/tags/latest.tar.gz}"
 
 if [[ ! -d "$INSTALL_DIR" ]]; then
     echo "❌ El servicio no está instalado en $INSTALL_DIR"

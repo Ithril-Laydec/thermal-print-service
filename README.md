@@ -1,6 +1,6 @@
 # Servicio de Impresión Térmica Multiplataforma
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/tu-org/thermal-print-service)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Ithril-Laydec/thermal-print-service)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Servicio local auto-instalable para impresión térmica ESC/POS con detección automática desde aplicaciones web.

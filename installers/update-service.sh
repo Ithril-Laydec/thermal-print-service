@@ -26,7 +26,7 @@ if [[ ! -d "$INSTALL_DIR" ]]; then
 fi
 
 echo "🔍 Verificando versión actual..."
-CURRENT_VERSION=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
+CURRENT_VERSION=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
 echo "📦 Versión actual: $CURRENT_VERSION"
 
 echo ""
@@ -106,6 +106,39 @@ cd $INSTALL_DIR
 bun install --production
 
 echo ""
+echo "🔒 Verificando configuración HTTPS..."
+if ! command -v mkcert &> /dev/null; then
+    echo "📦 Instalando mkcert..."
+    sudo apt install -y libnss3-tools wget
+
+    MKCERT_VERSION="v1.4.4"
+    MKCERT_URL="https://github.com/FiloSottile/mkcert/releases/download/${MKCERT_VERSION}/mkcert-${MKCERT_VERSION}-linux-amd64"
+
+    wget -q "$MKCERT_URL" -O /tmp/mkcert
+    chmod +x /tmp/mkcert
+    sudo mv /tmp/mkcert /usr/local/bin/mkcert
+
+    echo "✅ mkcert instalado"
+
+    echo ""
+    echo "🔐 Instalando Certificate Authority local..."
+    mkcert -install
+    echo "✅ CA local instalada"
+else
+    echo "✅ mkcert ya está instalado"
+fi
+
+echo ""
+echo "🔒 Generando certificados SSL..."
+cd $INSTALL_DIR
+if [ ! -f "localhost+2.pem" ] || [ ! -f "localhost+2-key.pem" ]; then
+    mkcert localhost 127.0.0.1 ::1
+    echo "✅ Certificados SSL generados"
+else
+    echo "✅ Certificados SSL ya existen"
+fi
+
+echo ""
 echo "🚀 Reiniciando servicio..."
 sudo systemctl start thermal-print.service
 
@@ -116,10 +149,17 @@ sleep 3
 echo ""
 echo "🔍 Verificando nueva versión..."
 if sudo systemctl is-active --quiet thermal-print.service; then
-    NEW_VERSION=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
+    NEW_VERSION=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
     echo "✅ Servicio actualizado correctamente"
     echo "📦 Versión anterior: $CURRENT_VERSION"
     echo "📦 Versión nueva: $NEW_VERSION"
+
+    # Verificar si está en HTTPS
+    if curl -sk https://localhost:20936/health > /dev/null 2>&1; then
+        echo "🔒 Servicio corriendo en HTTPS - ¡Sin warnings de certificados!"
+    elif curl -s http://localhost:20936/health > /dev/null 2>&1; then
+        echo "⚠️  Servicio corriendo en HTTP (sin HTTPS)"
+    fi
 
     if [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
         echo "⚠️  Las versiones son iguales. Puede que no haya actualización disponible."

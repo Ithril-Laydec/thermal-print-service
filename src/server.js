@@ -19,6 +19,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 
+// Version endpoint
+app.get('/version', (req, res) => {
+  const packageJson = require('../package.json')
+  res.json({
+    version: packageJson.version,
+    name: packageJson.name
+  })
+})
+
 // Función para buscar certificados mkcert
 function findCertificates() {
   const certPaths = [
@@ -52,8 +61,9 @@ if (credentials) {
   httpsServer.listen(PORT, HOST, () => {
     console.log('🖨️  Servicio de impresión térmica')
     console.log(`🔒 https://${HOST}:${PORT}`)
-    console.log('POST /print  - Imprime buffer ESC/POS')
-    console.log('GET  /health - Health check')
+    console.log('POST /print   - Imprime buffer ESC/POS')
+    console.log('GET  /health  - Health check')
+    console.log('GET  /version - Versión del servicio')
     console.log('✅ Certificados SSL cargados correctamente')
   })
 } else {
@@ -62,8 +72,9 @@ if (credentials) {
   httpServer.listen(PORT, HOST, () => {
     console.log('🖨️  Servicio de impresión térmica')
     console.log(`📡 http://${HOST}:${PORT}`)
-    console.log('POST /print  - Imprime buffer ESC/POS')
-    console.log('GET  /health - Health check')
+    console.log('POST /print   - Imprime buffer ESC/POS')
+    console.log('GET  /health  - Health check')
+    console.log('GET  /version - Versión del servicio')
     console.log('⚠️  Sin certificados SSL - ejecutando en HTTP')
     console.log('💡 Para HTTPS, genera certificados con: mkcert localhost 127.0.0.1 ::1')
   })

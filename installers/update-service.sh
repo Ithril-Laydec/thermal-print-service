@@ -26,7 +26,38 @@ if [[ ! -d "$INSTALL_DIR" ]]; then
 fi
 
 echo "🔍 Verificando versión actual..."
-CURRENT_VERSION=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
+
+# Función para obtener versión instalada
+get_installed_version() {
+  local version=""
+
+  # Intentar obtener versión del servicio en ejecución (intentar HTTPS primero, fallback a HTTP)
+  version=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+  if [ -n "$version" ]; then
+    echo "$version"
+    return 0
+  fi
+
+  version=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+  if [ -n "$version" ]; then
+    echo "$version"
+    return 0
+  fi
+
+  # Si no está corriendo, buscar en archivos locales
+  if [ -f "$INSTALL_DIR/package.json" ]; then
+    version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$INSTALL_DIR/package.json" | cut -d'"' -f4)
+    if [ -n "$version" ]; then
+      echo "$version"
+      return 0
+    fi
+  fi
+
+  echo "desconocida"
+  return 1
+}
+
+CURRENT_VERSION=$(get_installed_version)
 echo "📦 Versión actual: $CURRENT_VERSION"
 
 echo ""
@@ -149,7 +180,7 @@ sleep 3
 echo ""
 echo "🔍 Verificando nueva versión..."
 if sudo systemctl is-active --quiet thermal-print.service; then
-    NEW_VERSION=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
+    NEW_VERSION=$(get_installed_version)
     echo "✅ Servicio actualizado correctamente"
     echo "📦 Versión anterior: $CURRENT_VERSION"
     echo "📦 Versión nueva: $NEW_VERSION"

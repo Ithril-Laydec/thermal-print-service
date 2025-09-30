@@ -181,7 +181,13 @@ echo "🔍 Verificando estado del servicio..."
 if sudo systemctl is-active --quiet thermal-print.service; then
     echo "✅ Servicio iniciado correctamente"
 
-    VERSION=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+    VERSION=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+    if [ -z "$VERSION" ]; then
+        VERSION=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+    fi
+    if [ -z "$VERSION" ]; then
+        VERSION=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$INSTALL_DIR/package.json" | cut -d'"' -f4)
+    fi
     if [[ -n "$VERSION" ]]; then
         echo "📦 Versión instalada: $VERSION"
     fi

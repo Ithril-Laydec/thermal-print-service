@@ -44,22 +44,36 @@ echo ""
 
 # Función para obtener versión instalada
 get_installed_version() {
+  local version=""
+
   # Intentar obtener versión del servicio en ejecución (intentar HTTPS primero, fallback a HTTP)
-  if curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4; then
+  version=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+  if [ -n "$version" ]; then
+    echo "$version"
     return 0
-  elif curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4; then
+  fi
+
+  version=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+  if [ -n "$version" ]; then
+    echo "$version"
     return 0
   fi
 
   # Si no está corriendo, buscar en archivos locales
   if [ -f "$INSTALL_DIR/package.json" ]; then
-    grep -o '"version": "[^"]*"' "$INSTALL_DIR/package.json" | cut -d'"' -f4
-    return 0
+    version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$INSTALL_DIR/package.json" | cut -d'"' -f4)
+    if [ -n "$version" ]; then
+      echo "$version"
+      return 0
+    fi
   fi
 
   if [ -f "$LOCAL_DIR/package.json" ]; then
-    grep -o '"version": "[^"]*"' "$LOCAL_DIR/package.json" | cut -d'"' -f4
-    return 0
+    version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$LOCAL_DIR/package.json" | cut -d'"' -f4)
+    if [ -n "$version" ]; then
+      echo "$version"
+      return 0
+    fi
   fi
 
   echo "desconocida"
@@ -227,13 +241,13 @@ echo ""
 # Verificar estado final
 echo "🔍 Verificando estado final del servicio..."
 if curl -sk https://localhost:20936/health > /dev/null 2>&1; then
-  FINAL_VERSION=$(curl -sk https://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
+  FINAL_VERSION=$(get_installed_version)
   echo -e "${GREEN}✅ Servicio funcionando correctamente (HTTPS)${NC}"
   echo "   Versión instalada: $FINAL_VERSION"
   echo "   URL: https://localhost:20936"
   echo "   🔒 Certificados SSL configurados"
 elif curl -s http://localhost:20936/health > /dev/null 2>&1; then
-  FINAL_VERSION=$(curl -s http://localhost:20936/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "desconocida")
+  FINAL_VERSION=$(get_installed_version)
   echo -e "${GREEN}✅ Servicio funcionando correctamente (HTTP)${NC}"
   echo "   Versión instalada: $FINAL_VERSION"
   echo "   URL: http://localhost:20936"

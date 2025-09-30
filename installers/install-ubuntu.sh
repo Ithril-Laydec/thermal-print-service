@@ -34,14 +34,23 @@ if [[ ! $REPLY =~ ^[Ss]$ ]]; then
 fi
 
 echo ""
-echo "🔍 Verificando Node.js..."
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js no encontrado. Instalando..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-    echo "✅ Node.js instalado"
+echo "🔍 Verificando Bun..."
+if ! command -v bun &> /dev/null; then
+    echo "❌ Bun no encontrado. Instalando..."
+    curl -fsSL https://bun.sh/install | bash
+    export BUN_INSTALL="$HOME/.bun"
+    export PATH="$BUN_INSTALL/bin:$PATH"
+
+    # Crear symlink para systemd
+    sudo ln -sf "$HOME/.bun/bin/bun" /usr/local/bin/bun
+    echo "✅ Bun instalado"
 else
-    echo "✅ Node.js ya está instalado ($(node --version))"
+    echo "✅ Bun ya está instalado ($(bun --version))"
+    # Asegurar que existe el symlink
+    if [ ! -f /usr/local/bin/bun ]; then
+        BUN_PATH=$(which bun)
+        sudo ln -sf "$BUN_PATH" /usr/local/bin/bun
+    fi
 fi
 
 echo ""
@@ -95,7 +104,7 @@ sudo chown -R $USER:$USER $INSTALL_DIR
 echo ""
 echo "📦 Instalando dependencias..."
 cd $INSTALL_DIR
-npm install --production
+bun install --production
 
 echo ""
 echo "🔧 Configurando servicio systemd..."
@@ -109,7 +118,7 @@ After=network.target cups.service
 Type=simple
 User=$USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=/usr/bin/node $INSTALL_DIR/server.js
+ExecStart=/usr/local/bin/bun $INSTALL_DIR/server.js
 Restart=always
 RestartSec=10
 StandardOutput=journal

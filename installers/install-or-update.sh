@@ -179,7 +179,7 @@ else
           sudo systemctl status thermal-print --no-pager
         else
           echo "Para iniciar el servicio localmente, ejecuta:"
-          echo "  cd $LOCAL_DIR && npm start"
+          echo "  cd $LOCAL_DIR && bun start"
         fi
       fi
     fi
@@ -231,7 +231,7 @@ else
   if [ -d "$INSTALL_DIR" ]; then
     echo "  sudo systemctl start thermal-print"
   else
-    echo "  cd ~/thermal-print-service && npm start"
+    echo "  cd ~/thermal-print-service && bun start"
   fi
 fi
 

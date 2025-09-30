@@ -212,12 +212,65 @@ class AutoSetup {
             stdout.toLowerCase().includes('pos') ||
             stdout.toLowerCase().includes('thermal')) {
           console.log('✅ Impresora USB detectada')
+
+          // Configurar permisos del dispositivo
+          await this.setupDevicePermissions()
+
           return true
         }
       } catch {}
     }
 
     console.log('⚠️  No se detectó impresora USB. Asegúrate de que esté conectada y encendida.')
+    return false
+  }
+
+  async setupDevicePermissions() {
+    console.log('🔐 Configurando permisos del dispositivo...')
+
+    const fs = require('fs')
+    const devices = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/lp0', '/dev/lp1']
+
+    for (const device of devices) {
+      if (fs.existsSync(device)) {
+        console.log(`📝 Dispositivo encontrado: ${device}`)
+
+        try {
+          // Verificar si tenemos permisos de escritura
+          fs.accessSync(device, fs.constants.W_OK)
+          console.log(`✅ Permisos correctos en ${device}`)
+          return true
+        } catch {
+          console.log(`⚠️  Sin permisos en ${device}, configurando...`)
+
+          try {
+            // Intentar dar permisos con sudo
+            await execAsync(`sudo chmod 666 ${device}`)
+            console.log(`✅ Permisos configurados en ${device}`)
+
+            // Crear regla udev para permisos permanentes
+            const udevRule = `
+# Regla para impresora térmica
+SUBSYSTEM=="usb", ATTRS{idVendor}=="*", MODE="0666"
+KERNEL=="lp[0-9]*", MODE="0666"
+`
+            try {
+              await execAsync(`echo '${udevRule}' | sudo tee /etc/udev/rules.d/99-thermal-printer.rules`)
+              await execAsync('sudo udevadm control --reload-rules')
+              console.log('✅ Regla udev creada para permisos permanentes')
+            } catch {
+              console.log('⚠️  No se pudo crear regla udev permanente')
+            }
+
+            return true
+          } catch (error) {
+            console.log(`❌ No se pudieron configurar permisos en ${device}`)
+            console.log(`   Ejecuta manualmente: sudo chmod 666 ${device}`)
+          }
+        }
+      }
+    }
+
     return false
   }
 }

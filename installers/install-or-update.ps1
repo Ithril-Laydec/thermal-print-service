@@ -73,36 +73,30 @@ if (Test-Path $INSTALL_DIR) {
 
 # Verificar Node.js
 Write-Host ""
-Write-Host "🔍 Verificando Node.js..." -ForegroundColor Yellow
+Write-Host "🔍 Verificando Bun..." -ForegroundColor Yellow
 try {
-    $nodeVersion = node --version
-    Write-Host "✅ Node.js instalado ($nodeVersion)" -ForegroundColor Green
+    $bunVersion = bun --version
+    Write-Host "✅ Bun instalado ($bunVersion)" -ForegroundColor Green
 } catch {
-    Write-Host "❌ Node.js no encontrado" -ForegroundColor Red
+    Write-Host "❌ Bun no encontrado" -ForegroundColor Red
     Write-Host ""
-    Write-Host "Node.js es necesario para el servicio." -ForegroundColor Yellow
+    Write-Host "Bun es necesario para el servicio." -ForegroundColor Yellow
 
-    $installNode = Read-Host "¿Deseas que lo instale automáticamente? (S/N)"
-    if ($installNode -eq 'S' -or $installNode -eq 's') {
-        Write-Host "📥 Descargando Node.js..." -ForegroundColor Green
+    $installBun = Read-Host "¿Deseas que lo instale automáticamente? (S/N)"
+    if ($installBun -eq 'S' -or $installBun -eq 's') {
+        Write-Host "📦 Instalando Bun..." -ForegroundColor Green
 
-        # Descargar e instalar Node.js
-        $nodeUrl = "https://nodejs.org/dist/v18.17.0/node-v18.17.0-x64.msi"
-        $nodeMsi = "$env:TEMP\node-installer.msi"
-
-        Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeMsi -UseBasicParsing
-
-        Write-Host "📦 Instalando Node.js..." -ForegroundColor Green
-        Start-Process msiexec.exe -ArgumentList "/i", $nodeMsi, "/quiet" -Wait
-
-        Remove-Item $nodeMsi -Force
-
-        # Refrescar PATH
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-
-        Write-Host "✅ Node.js instalado exitosamente" -ForegroundColor Green
+        try {
+            irm bun.sh/install.ps1 | iex
+            $env:Path = "$env:USERPROFILE\.bun\bin;$env:Path"
+            Write-Host "✅ Bun instalado exitosamente" -ForegroundColor Green
+        } catch {
+            Write-Host "❌ Error instalando Bun" -ForegroundColor Red
+            Write-Host "Por favor, instala Bun desde: https://bun.sh" -ForegroundColor Yellow
+            exit 1
+        }
     } else {
-        Write-Host "Por favor, instala Node.js desde: https://nodejs.org" -ForegroundColor Yellow
+        Write-Host "Por favor, instala Bun desde: https://bun.sh" -ForegroundColor Yellow
         Write-Host "Después ejecuta este script nuevamente" -ForegroundColor Yellow
         exit 1
     }

@@ -4,18 +4,11 @@
   "description": "Servicio local para impresión térmica multiplataforma con auto-instalación",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "test-print": "node tests/test-print.js",
-    "test-chars": "node tests/test-caracteres.js",
-    "test-euro": "node tests/test-euro-tildes.js",
-    "test-comparativo": "node tests/test-comparativo.js",
-    "test-iconv": "node tests/test-iconv.js",
-    "check": "node tests/check-installation.js"
+    "start": "bun server.js",
+    "dev": "bun --watch server.js",
+    "test": "bun test-simple.js"
   },
   "dependencies": {
-    "@node-escpos/core": "^0.6.0",
-    "@node-escpos/usb-adapter": "^0.3.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "iconv-lite": "^0.7.0",

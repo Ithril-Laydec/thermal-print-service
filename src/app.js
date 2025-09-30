@@ -4,7 +4,7 @@ const cors = require('cors')
 // Controllers
 const { getHealth, getVersion } = require('./controllers/healthController')
 const { getStatus, setServiceStartTime } = require('./controllers/statusController')
-const { printTicket } = require('./controllers/printController')
+const { printTicket, printRaw } = require('./controllers/printController')
 const { getPrinters, getDiagnostics, checkPrinterAvailability } = require('./controllers/printerController')
 
 // Configuration
@@ -17,6 +17,9 @@ setServiceStartTime(Date.now())
 
 // Middleware
 app.use(cors())
+
+// Route-specific middleware
+app.post('/print/raw', express.raw({ type: '*/*', limit: '10mb' }), printRaw)
 app.use(express.json())
 
 // Routes

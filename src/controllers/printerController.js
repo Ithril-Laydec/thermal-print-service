@@ -1,5 +1,4 @@
 const { detectThermalPrinters } = require('../utils/system')
-const { createPrinter } = require('../services/PrinterService')
 
 /**
  * List available printers endpoint
@@ -34,32 +33,13 @@ async function getDiagnostics(req, res) {
 
     const detection = await detectThermalPrinters()
 
-    // Intentar crear una impresora para verificar configuración
-    let printerConfig = null
-    let printerError = null
-
-    try {
-      await createPrinter()
-      printerConfig = 'Configuración exitosa'
-    } catch (error) {
-      printerError = error.message
-    }
-
     res.json({
       service: 'thermal-print-service',
       status: 'running',
       port: process.env.PORT || 20936,
       timestamp: new Date().toISOString(),
       detection: detection,
-      printerConfiguration: {
-        success: !!printerConfig,
-        message: printerConfig || printerError
-      },
-      recommendations: printerError ? [
-        'Verifica que la impresora esté conectada y encendida',
-        'Ejecuta: npm run install-drivers',
-        'Comprueba que existe impresora "ALBARAN" o "Albaranes" en CUPS'
-      ] : ['Todo configurado correctamente']
+      recommendations: ['Servicio funcionando correctamente']
     })
   } catch (error) {
     res.status(500).json({
@@ -75,27 +55,21 @@ async function getDiagnostics(req, res) {
  */
 async function checkPrinterAvailability(req, res) {
   try {
-    // Intentar crear una conexión con la impresora
-    const printer = await createPrinter()
+    const detection = await detectThermalPrinters()
+    const available = detection.usbConnected || detection.cupsAvailable
 
     res.json({
-      available: true,
-      status: 'online',
-      message: 'Impresora disponible y lista para imprimir',
+      available: available,
+      status: available ? 'online' : 'offline',
+      message: available ? 'Impresora disponible' : 'Impresora no disponible',
       timestamp: new Date().toISOString()
     })
   } catch (error) {
-    // Si falla, la impresora no está disponible
     res.json({
       available: false,
       status: 'offline',
-      message: 'Impresora no disponible',
+      message: 'Error verificando impresora',
       error: error.message,
-      suggestions: [
-        'Verifica que la impresora esté encendida',
-        'Comprueba que la impresora esté conectada',
-        'Verifica la configuración en CUPS'
-      ],
       timestamp: new Date().toISOString()
     })
   }

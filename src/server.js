@@ -48,7 +48,7 @@ async function startServer() {
         console.log('🔔 ACTUALIZACIÓN DISPONIBLE!')
         console.log(`   Versión actual: ${updateInfo.currentVersion}`)
         console.log(`   Nueva versión: ${updateInfo.latestVersion}`)
-        console.log(`   Actualiza con: git pull && npm install && npm start`)
+        console.log(`   Actualiza con: git pull && bun install && bun start`)
         console.log('')
       }
     } catch (error) {
@@ -72,7 +72,7 @@ async function startServer() {
 // Manejar errores no capturados
 process.on('uncaughtException', (error) => {
   console.log('❌ Error crítico:', error.message)
-  console.log('🔄 Reinicia el servicio: npm start')
+  console.log('🔄 Reinicia el servicio: bun start')
   process.exit(1)
 })
 

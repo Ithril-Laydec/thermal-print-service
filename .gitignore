@@ -71,3 +71,4 @@ bun.lock
 
 # Otros archivos que no deseas rastrear
 ANTES*.md
+tmp/

@@ -5,15 +5,14 @@
 
 Servicio local auto-instalable para impresión térmica ESC/POS con detección automática desde aplicaciones web.
 
-## 🚀 **INSTALACIÓN CON UN CLICK**
+## 🚀 **SERVICIO SIMPLIFICADO ESC/POS**
 
-### Para Usuarios Finales
+Este servicio recibe comandos ESC/POS directamente desde el frontend y los imprime.
 
-1. Abre la aplicación web
-2. Selecciona "Impresión Térmica"
-3. Click en "Instalar Servicio" si no está instalado
-4. Descarga y ejecuta el instalador para tu sistema
-5. ¡Listo! El servicio se inicia automáticamente
+### Características:
+- **Sin procesamiento de etiquetas** - El frontend envía comandos ESC/POS directos
+- **CP858 automático** - Para caracteres especiales (€, ñ, á, é, í, ó, ú)
+- **Mínima configuración** - Solo necesita permisos en el dispositivo USB
 
 ### Instalación Manual
 
@@ -32,11 +31,17 @@ chmod +x installers/install-ubuntu.sh
 
 ```bash
 cd thermal-print-service
-npm install
-npm start
+bun install
+
+# IMPORTANTE: Dar permisos al dispositivo (requerido)
+sudo chmod 666 /dev/usb/lp0
+
+bun start
 ```
 
 **¡Y LISTO!** - Automáticamente instala y configura todo lo necesario
+
+**Nota:** El comando `sudo chmod 666 /dev/usb/lp0` es necesario para que el servicio pueda escribir directamente al dispositivo de la impresora
 
 ## ✅ **LO QUE HACE AUTOMÁTICAMENTE:**
 
@@ -124,10 +129,12 @@ curl -X POST http://localhost:20936/print/ticket \
 
 ### Desarrollo
 ```bash
-npm start               # Iniciar servicio (puerto 20936)
-npm run test-print      # Probar impresión básica
-npm run test-chars      # Probar caracteres especiales (€, á, ñ, etc.)
-npm run check           # Verificar instalación
+# Dar permisos (ejecutar primero si hay problemas)
+sudo chmod 666 /dev/usb/lp0
+
+bun start               # Iniciar servicio (puerto 20936)
+bun dev                 # Iniciar con auto-reload
+bun test                # Test completo del sistema
 ```
 
 ### Producción (Servicio Instalado)

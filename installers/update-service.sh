@@ -81,9 +81,29 @@ fi
 sudo chown -R $USER:$USER $INSTALL_DIR
 
 echo ""
+echo "🔍 Verificando Bun..."
+if ! command -v bun &> /dev/null; then
+    echo "❌ Bun no encontrado. Instalando..."
+    curl -fsSL https://bun.sh/install | bash
+    export BUN_INSTALL="$HOME/.bun"
+    export PATH="$BUN_INSTALL/bin:$PATH"
+
+    # Crear symlink para systemd
+    sudo ln -sf "$HOME/.bun/bin/bun" /usr/local/bin/bun
+    echo "✅ Bun instalado"
+else
+    echo "✅ Bun ya está instalado ($(bun --version))"
+    # Asegurar que existe el symlink
+    if [ ! -f /usr/local/bin/bun ]; then
+        BUN_PATH=$(which bun)
+        sudo ln -sf "$BUN_PATH" /usr/local/bin/bun
+    fi
+fi
+
+echo ""
 echo "📦 Actualizando dependencias..."
 cd $INSTALL_DIR
-npm install --production
+bun install --production
 
 echo ""
 echo "🚀 Reiniciando servicio..."

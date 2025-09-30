@@ -88,9 +88,28 @@ try {
 }
 
 Write-Host ""
+Write-Host "🔍 Verificando Bun..." -ForegroundColor Cyan
+try {
+    $bunVersion = bun --version
+    Write-Host "✅ Bun ya está instalado ($bunVersion)" -ForegroundColor Green
+} catch {
+    Write-Host "❌ Bun no encontrado. Instalando..." -ForegroundColor Yellow
+    try {
+        irm bun.sh/install.ps1 | iex
+        $env:Path = "$env:USERPROFILE\.bun\bin;$env:Path"
+        Write-Host "✅ Bun instalado" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Error instalando Bun" -ForegroundColor Red
+        Write-Host "🔄 Restaurando backup..." -ForegroundColor Yellow
+        Start-Service -Name $SERVICE_NAME
+        exit 1
+    }
+}
+
+Write-Host ""
 Write-Host "📦 Actualizando dependencias..." -ForegroundColor Cyan
 Set-Location $INSTALL_DIR
-& npm install --production
+& bun install --production
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Error instalando dependencias" -ForegroundColor Red

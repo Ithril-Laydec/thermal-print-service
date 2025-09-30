@@ -26,15 +26,21 @@ if ($confirmation -ne 'S' -and $confirmation -ne 's') {
 }
 
 Write-Host ""
-Write-Host "🔍 Verificando Node.js..." -ForegroundColor Cyan
+Write-Host "🔍 Verificando Bun..." -ForegroundColor Cyan
 try {
-    $nodeVersion = node --version
-    Write-Host "✅ Node.js ya está instalado ($nodeVersion)" -ForegroundColor Green
+    $bunVersion = bun --version
+    Write-Host "✅ Bun ya está instalado ($bunVersion)" -ForegroundColor Green
 } catch {
-    Write-Host "❌ Node.js no encontrado" -ForegroundColor Red
-    Write-Host "Por favor, instala Node.js desde: https://nodejs.org" -ForegroundColor Yellow
-    Write-Host "Después ejecuta este script nuevamente" -ForegroundColor Yellow
-    exit 1
+    Write-Host "❌ Bun no encontrado. Instalando..." -ForegroundColor Yellow
+    try {
+        irm bun.sh/install.ps1 | iex
+        $env:Path = "$env:USERPROFILE\.bun\bin;$env:Path"
+        Write-Host "✅ Bun instalado" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Error instalando Bun" -ForegroundColor Red
+        Write-Host "Instala Bun manualmente desde: https://bun.sh" -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 Write-Host ""
@@ -85,7 +91,7 @@ if ($extractedDir) {
 Write-Host ""
 Write-Host "📦 Instalando dependencias..." -ForegroundColor Cyan
 Set-Location $INSTALL_DIR
-& npm install --production
+& bun install --production
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Error instalando dependencias" -ForegroundColor Red
@@ -95,10 +101,10 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Cyan
 
-$nodeExe = (Get-Command node).Source
+$bunExe = (Get-Command bun).Source
 $serverJs = Join-Path $INSTALL_DIR "server.js"
 
-& sc.exe create $SERVICE_NAME binPath= "`"$nodeExe`" `"$serverJs`"" start= auto DisplayName= "Thermal Print Service"
+& sc.exe create $SERVICE_NAME binPath= "`"$bunExe`" `"$serverJs`"" start= auto DisplayName= "Thermal Print Service"
 & sc.exe description $SERVICE_NAME "Servicio local para impresión térmica ESC/POS"
 & sc.exe failure $SERVICE_NAME reset= 86400 actions= restart/5000/restart/5000/restart/5000
 

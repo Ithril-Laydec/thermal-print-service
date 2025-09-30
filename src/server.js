@@ -24,7 +24,9 @@ app.get('/version', (req, res) => {
   const packageJson = require('../package.json')
   res.json({
     version: packageJson.version,
-    name: packageJson.name
+    name: packageJson.name,
+    https: !!credentials,
+    protocol: credentials ? 'https' : 'http'
   })
 })
 

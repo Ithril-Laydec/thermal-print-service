@@ -19,6 +19,8 @@ Servicio minimalista para impresión térmica ESC/POS con soporte HTTPS.
 
 ## Instalación
 
+⭐ **UN SOLO COMANDO que lo instala TODO** (incluyendo Bun, mkcert, certificados SSL y el servicio):
+
 ### Linux (Ubuntu/Debian)
 
 ```bash
@@ -30,6 +32,17 @@ curl -fsSL https://github.com/Ithril-Laydec/thermal-print-service/raw/master/ins
 ```powershell
 irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install-or-update.ps1 | iex
 ```
+
+✨ **Qué hace automáticamente:**
+- ✅ Instala Bun (si no está instalado)
+- ✅ Instala mkcert (para certificados HTTPS)
+- ✅ Configura la Certificate Authority local
+- ✅ Genera certificados SSL para localhost
+- ✅ Descarga e instala el servicio
+- ✅ Lo configura como servicio del sistema
+- ✅ Lo inicia automáticamente
+
+🔄 **Actualización**: El mismo comando detecta si ya está instalado y lo actualiza, regenerando los certificados si es necesario.
 
 ## Desarrollo Local con HTTPS
 

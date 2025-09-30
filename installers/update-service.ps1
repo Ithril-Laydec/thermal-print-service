@@ -21,12 +21,20 @@ if (-not (Test-Path $INSTALL_DIR)) {
 
 Write-Host "🔍 Verificando versión actual..." -ForegroundColor Cyan
 try {
-    $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get
+    # Intentar HTTPS primero
+    $response = Invoke-RestMethod -Uri "https://localhost:20936/version" -Method Get -TimeoutSec 2 -SkipCertificateCheck
     $currentVersion = $response.version
-    Write-Host "📦 Versión actual: $currentVersion" -ForegroundColor Green
+    Write-Host "📦 Versión actual: $currentVersion (HTTPS)" -ForegroundColor Green
 } catch {
-    $currentVersion = "desconocida"
-    Write-Host "⚠️  No se pudo obtener la versión actual" -ForegroundColor Yellow
+    try {
+        # Fallback a HTTP
+        $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get -TimeoutSec 2
+        $currentVersion = $response.version
+        Write-Host "📦 Versión actual: $currentVersion (HTTP)" -ForegroundColor Green
+    } catch {
+        $currentVersion = "desconocida"
+        Write-Host "⚠️  No se pudo obtener la versión actual" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""
@@ -121,6 +129,52 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
+Write-Host "🔒 Verificando configuración HTTPS con mkcert..." -ForegroundColor Cyan
+try {
+    $mkcertVersion = mkcert -version
+    Write-Host "✅ mkcert ya está instalado" -ForegroundColor Green
+} catch {
+    Write-Host "📦 Instalando mkcert..." -ForegroundColor Yellow
+
+    # Descargar e instalar mkcert
+    $mkcertUrl = "https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe"
+    $mkcertPath = "C:\Windows\System32\mkcert.exe"
+
+    try {
+        Invoke-WebRequest -Uri $mkcertUrl -OutFile $mkcertPath -UseBasicParsing
+        Write-Host "✅ mkcert instalado" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Error instalando mkcert: $_" -ForegroundColor Red
+        Write-Host "⚠️  Continuando sin HTTPS..." -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
+Write-Host "🔐 Instalando Certificate Authority local..." -ForegroundColor Cyan
+try {
+    & mkcert -install
+    Write-Host "✅ CA local instalada - ¡Sin warnings de certificados en el navegador!" -ForegroundColor Green
+} catch {
+    Write-Host "⚠️  No se pudo instalar la CA local" -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "🔒 Generando certificados SSL para localhost..." -ForegroundColor Cyan
+Set-Location $INSTALL_DIR
+try {
+    # Solo generar si no existen
+    if (-not (Test-Path "$INSTALL_DIR\localhost+2.pem") -or -not (Test-Path "$INSTALL_DIR\localhost+2-key.pem")) {
+        & mkcert localhost 127.0.0.1 ::1
+        Write-Host "✅ Certificados SSL generados" -ForegroundColor Green
+    } else {
+        Write-Host "✅ Certificados SSL ya existen" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "⚠️  No se pudieron generar certificados" -ForegroundColor Yellow
+    Write-Host "     El servicio funcionará en HTTP" -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "🚀 Reiniciando servicio..." -ForegroundColor Cyan
 Start-Service -Name $SERVICE_NAME
 Start-Sleep -Seconds 3
@@ -130,17 +184,33 @@ Write-Host "🔍 Verificando nueva versión..." -ForegroundColor Cyan
 $service = Get-Service -Name $SERVICE_NAME
 if ($service.Status -eq 'Running') {
     try {
-        $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get
+        # Intentar HTTPS primero
+        $response = Invoke-RestMethod -Uri "https://localhost:20936/version" -Method Get -TimeoutSec 2 -SkipCertificateCheck
         $newVersion = $response.version
-        Write-Host "✅ Servicio actualizado correctamente" -ForegroundColor Green
+        Write-Host "✅ Servicio actualizado correctamente (HTTPS)" -ForegroundColor Green
         Write-Host "📦 Versión anterior: $currentVersion" -ForegroundColor Yellow
         Write-Host "📦 Versión nueva: $newVersion" -ForegroundColor Green
+        Write-Host "🔒 Certificados SSL configurados correctamente" -ForegroundColor Green
 
         if ($currentVersion -eq $newVersion) {
             Write-Host "⚠️  Las versiones son iguales. Puede que no haya actualización disponible." -ForegroundColor Yellow
         }
     } catch {
-        Write-Host "⚠️  No se pudo verificar la nueva versión" -ForegroundColor Yellow
+        try {
+            # Fallback a HTTP
+            $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get -TimeoutSec 2
+            $newVersion = $response.version
+            Write-Host "✅ Servicio actualizado correctamente (HTTP)" -ForegroundColor Green
+            Write-Host "📦 Versión anterior: $currentVersion" -ForegroundColor Yellow
+            Write-Host "📦 Versión nueva: $newVersion" -ForegroundColor Green
+            Write-Host "⚠️  Sin HTTPS - Los certificados no se configuraron correctamente" -ForegroundColor Yellow
+
+            if ($currentVersion -eq $newVersion) {
+                Write-Host "⚠️  Las versiones son iguales. Puede que no haya actualización disponible." -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "⚠️  No se pudo verificar la nueva versión" -ForegroundColor Yellow
+        }
     }
 } else {
     Write-Host "❌ El servicio no se inició correctamente" -ForegroundColor Red

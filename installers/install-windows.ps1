@@ -91,7 +91,10 @@ if ($extractedDir) {
 Write-Host ""
 Write-Host "📦 Instalando dependencias..." -ForegroundColor Cyan
 Set-Location $INSTALL_DIR
-& bun install --production --no-frozen-lockfile
+# Eliminar lockfile para evitar conflictos
+Remove-Item -Path "package-lock.json" -ErrorAction SilentlyContinue
+Remove-Item -Path "bun.lockb" -ErrorAction SilentlyContinue
+& bun install --production
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Error instalando dependencias" -ForegroundColor Red

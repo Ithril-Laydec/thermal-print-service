@@ -134,7 +134,9 @@ fi
 echo ""
 echo "📦 Actualizando dependencias..."
 cd $INSTALL_DIR
-bun install --production --no-frozen-lockfile
+# Eliminar lockfile para evitar conflictos
+rm -f package-lock.json bun.lockb
+bun install --production
 
 echo ""
 echo "🔒 Verificando configuración HTTPS..."

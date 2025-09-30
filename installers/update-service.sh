@@ -134,7 +134,7 @@ fi
 echo ""
 echo "📦 Actualizando dependencias..."
 cd $INSTALL_DIR
-bun install --production
+bun install --production --no-frozen-lockfile
 
 echo ""
 echo "🔒 Verificando configuración HTTPS..."

@@ -129,7 +129,7 @@ sudo chown -R $USER:$USER $INSTALL_DIR
 echo ""
 echo "📦 Instalando dependencias..."
 cd $INSTALL_DIR
-bun install --production
+bun install --production --no-frozen-lockfile
 
 echo ""
 echo "🔒 Generando certificados SSL para localhost..."

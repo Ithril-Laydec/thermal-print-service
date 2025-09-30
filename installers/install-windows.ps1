@@ -99,6 +99,46 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
+Write-Host "🔒 Configurando HTTPS con mkcert..." -ForegroundColor Cyan
+try {
+    $mkcertVersion = mkcert -version
+    Write-Host "✅ mkcert ya está instalado" -ForegroundColor Green
+} catch {
+    Write-Host "📦 Instalando mkcert..." -ForegroundColor Yellow
+
+    # Descargar e instalar mkcert
+    $mkcertUrl = "https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe"
+    $mkcertPath = "C:\Windows\System32\mkcert.exe"
+
+    try {
+        Invoke-WebRequest -Uri $mkcertUrl -OutFile $mkcertPath -UseBasicParsing
+        Write-Host "✅ mkcert instalado" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Error instalando mkcert: $_" -ForegroundColor Red
+        Write-Host "⚠️  Continuando sin HTTPS..." -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
+Write-Host "🔐 Instalando Certificate Authority local..." -ForegroundColor Cyan
+try {
+    & mkcert -install
+    Write-Host "✅ CA local instalada - ¡Sin warnings de certificados en el navegador!" -ForegroundColor Green
+} catch {
+    Write-Host "⚠️  No se pudo instalar la CA local" -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "🔒 Generando certificados SSL para localhost..." -ForegroundColor Cyan
+Set-Location $INSTALL_DIR
+try {
+    & mkcert localhost 127.0.0.1 ::1
+    Write-Host "✅ Certificados SSL generados" -ForegroundColor Green
+} catch {
+    Write-Host "⚠️  No se pudieron generar certificados" -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Cyan
 
 $bunExe = (Get-Command bun).Source
@@ -122,10 +162,17 @@ if ($service.Status -eq 'Running') {
     Write-Host "✅ Servicio iniciado correctamente" -ForegroundColor Green
 
     try {
-        $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get
-        Write-Host "📦 Versión instalada: $($response.version)" -ForegroundColor Green
+        # Intentar HTTPS primero
+        $response = Invoke-RestMethod -Uri "https://localhost:20936/health" -Method Get -SkipCertificateCheck
+        Write-Host "🔒 Servicio funcionando con HTTPS" -ForegroundColor Green
     } catch {
-        Write-Host "⚠️  No se pudo verificar la versión (el servicio puede estar iniciándose)" -ForegroundColor Yellow
+        try {
+            # Fallback a HTTP
+            $response = Invoke-RestMethod -Uri "http://localhost:20936/health" -Method Get
+            Write-Host "⚠️  Servicio funcionando con HTTP (sin HTTPS)" -ForegroundColor Yellow
+        } catch {
+            Write-Host "⚠️  No se pudo verificar el servicio (puede estar iniciándose)" -ForegroundColor Yellow
+        }
     }
 } else {
     Write-Host "⚠️  El servicio no se inició correctamente" -ForegroundColor Yellow
@@ -144,11 +191,12 @@ Write-Host "   Restart-Service ThermalPrintService       # Reiniciar"
 Write-Host "   Stop-Service ThermalPrintService          # Detener"
 Write-Host "   Get-EventLog -LogName Application -Source ThermalPrintService  # Ver logs"
 Write-Host ""
-Write-Host "🌐 El servicio está disponible en: http://localhost:20936" -ForegroundColor Cyan
+Write-Host "🌐 El servicio está disponible en: https://localhost:20936" -ForegroundColor Cyan
+Write-Host "🔒 Con certificados SSL - ¡Sin warnings en el navegador!" -ForegroundColor Green
+Write-Host ""
 Write-Host "🎯 Endpoints:" -ForegroundColor Cyan
-Write-Host "   GET  http://localhost:20936/health"
-Write-Host "   GET  http://localhost:20936/version"
-Write-Host "   POST http://localhost:20936/print/ticket"
+Write-Host "   GET  https://localhost:20936/health"
+Write-Host "   POST https://localhost:20936/print"
 Write-Host ""
 Write-Host "💡 El servicio se iniciará automáticamente al arrancar Windows" -ForegroundColor Green
 Write-Host "=============================================================" -ForegroundColor Cyan

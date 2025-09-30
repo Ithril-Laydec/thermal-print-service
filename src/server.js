@@ -1,92 +1,70 @@
-const { app, PORT, HOST } = require('./app')
-const AutoSetup = require('./services/auto-setup')
-const { detectThermalPrinters } = require('./utils/system')
-const { checkForUpdates } = require('./utils/update-checker')
-const packageJson = require('../package.json')
+const express = require('express')
+const https = require('https')
+const http = require('http')
+const fs = require('fs')
+const path = require('path')
+const cors = require('cors')
+const { printRaw } = require('./controllers/printController')
+const { PORT, HOST } = require('./config/config')
 
-async function startServer() {
-  console.log('🚀 Iniciando servicio de impresión térmica...')
-  console.log('=' .repeat(50))
+const app = express()
 
-  // 1. AUTO-SETUP INTELIGENTE 🤖
-  const autoSetup = new AutoSetup()
-  console.log('🔧 Verificando y configurando drivers automáticamente...')
+// Middleware
+app.use(cors())
+app.post('/print', express.raw({ type: '*/*', limit: '10mb' }), printRaw)
+app.use(express.json())
 
-  try {
-    const driversOk = await autoSetup.checkAndInstallDrivers()
-    if (!driversOk) {
-      console.log('⚠️  Advertencia: Drivers no configurados óptimamente')
-      console.log('   El servicio continuará, pero puede tener problemas de impresión')
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' })
+})
+
+// Función para buscar certificados mkcert
+function findCertificates() {
+  const certPaths = [
+    // Ruta relativa al proyecto
+    path.join(__dirname, '..', 'localhost+2.pem'),
+    path.join(__dirname, '..', 'localhost+2-key.pem'),
+    // Otras posibles ubicaciones
+    path.join(__dirname, '..', 'certs', 'localhost+2.pem'),
+    path.join(__dirname, '..', 'certs', 'localhost+2-key.pem'),
+  ]
+
+  const cert = certPaths[0]
+  const key = certPaths[1]
+
+  if (fs.existsSync(cert) && fs.existsSync(key)) {
+    return {
+      cert: fs.readFileSync(cert),
+      key: fs.readFileSync(key)
     }
-
-    // 2. Verificar conexión de impresora
-    await autoSetup.checkPrinterConnection()
-
-  } catch (error) {
-    console.log('⚠️  Error en configuración automática:', error.message)
-    console.log('   El servicio continuará con configuración básica')
   }
 
-  console.log('')
-  console.log('🖨️  Iniciando servidor HTTP...')
-
-  // 3. Ejecutar detección de impresoras
-  await detectThermalPrinters()
-
-  // 4. Iniciar servidor
-  app.listen(PORT, async () => {
-    console.log('')
-    console.log('✅ Servicio de impresión térmica LISTO')
-    console.log(`📡 Servidor ejecutándose en http://${HOST}:${PORT}`)
-    console.log(`📦 Versión: ${packageJson.version}`)
-
-    // 5. Verificar actualizaciones
-    try {
-      const updateInfo = await checkForUpdates()
-      if (updateInfo.updateAvailable) {
-        console.log('')
-        console.log('🔔 ACTUALIZACIÓN DISPONIBLE!')
-        console.log(`   Versión actual: ${updateInfo.currentVersion}`)
-        console.log(`   Nueva versión: ${updateInfo.latestVersion}`)
-        console.log(`   Actualiza con: git pull && bun install && bun start`)
-        console.log('')
-      }
-    } catch (error) {
-      // Silently fail update check
-    }
-
-    console.log(`🔧 Endpoints disponibles:`)
-    console.log(`   POST /print/ticket    - Imprimir ticket`)
-    console.log(`   GET  /health          - Estado del servicio`)
-    console.log(`   GET  /version         - Versión del servicio`)
-    console.log(`   GET  /status          - Estado completo y diagnóstico`)
-    console.log(`   GET  /printers        - Impresoras disponibles`)
-    console.log(`   GET  /printer/check   - Verificar si impresora está disponible`)
-    console.log(`   GET  /diagnostics     - Diagnóstico completo`)
-    console.log('')
-    console.log('🎉 ¡Todo listo! Usa tu aplicación Vue normalmente')
-    console.log('=' .repeat(50))
-  })
+  return null
 }
 
-// Manejar errores no capturados
-process.on('uncaughtException', (error) => {
-  console.log('❌ Error crítico:', error.message)
-  console.log('🔄 Reinicia el servicio: bun start')
-  process.exit(1)
-})
+// Iniciar servidor (HTTPS si hay certificados, HTTP si no)
+const credentials = findCertificates()
 
-process.on('unhandledRejection', (error) => {
-  console.log('❌ Error de promesa:', error.message)
-})
-
-// Iniciar servidor
-startServer().catch(error => {
-  console.log('❌ Error iniciando servidor:', error.message)
-  console.log('')
-  console.log('🔧 Posibles soluciones:')
-  console.log('   • Verifica que no haya otro servicio en el puerto', PORT)
-  console.log('   • Ejecuta como administrador si es necesario')
-  console.log('   • Verifica que la impresora esté conectada')
-  process.exit(1)
-})
+if (credentials) {
+  // Servidor HTTPS
+  const httpsServer = https.createServer(credentials, app)
+  httpsServer.listen(PORT, HOST, () => {
+    console.log('🖨️  Servicio de impresión térmica')
+    console.log(`🔒 https://${HOST}:${PORT}`)
+    console.log('POST /print  - Imprime buffer ESC/POS')
+    console.log('GET  /health - Health check')
+    console.log('✅ Certificados SSL cargados correctamente')
+  })
+} else {
+  // Fallback a HTTP
+  const httpServer = http.createServer(app)
+  httpServer.listen(PORT, HOST, () => {
+    console.log('🖨️  Servicio de impresión térmica')
+    console.log(`📡 http://${HOST}:${PORT}`)
+    console.log('POST /print  - Imprime buffer ESC/POS')
+    console.log('GET  /health - Health check')
+    console.log('⚠️  Sin certificados SSL - ejecutando en HTTP')
+    console.log('💡 Para HTTPS, genera certificados con: mkcert localhost 127.0.0.1 ::1')
+  })
+}

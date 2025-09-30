@@ -65,6 +65,31 @@ else
 fi
 
 echo ""
+echo "🔒 Configurando HTTPS con mkcert..."
+if ! command -v mkcert &> /dev/null; then
+    echo "📦 Instalando mkcert..."
+    # Instalar libnss3-tools (requerido)
+    sudo apt install -y libnss3-tools wget
+
+    # Descargar e instalar mkcert
+    MKCERT_VERSION="v1.4.4"
+    MKCERT_URL="https://github.com/FiloSottile/mkcert/releases/download/${MKCERT_VERSION}/mkcert-${MKCERT_VERSION}-linux-amd64"
+
+    wget -q "$MKCERT_URL" -O /tmp/mkcert
+    chmod +x /tmp/mkcert
+    sudo mv /tmp/mkcert /usr/local/bin/mkcert
+
+    echo "✅ mkcert instalado"
+else
+    echo "✅ mkcert ya está instalado"
+fi
+
+echo ""
+echo "🔐 Instalando Certificate Authority local..."
+mkcert -install
+echo "✅ CA local instalada - ¡Sin warnings de certificados en el navegador!"
+
+echo ""
 echo "👥 Configurando permisos de usuario..."
 sudo usermod -a -G lp $USER
 echo "✅ Usuario añadido al grupo lp"
@@ -105,6 +130,12 @@ echo ""
 echo "📦 Instalando dependencias..."
 cd $INSTALL_DIR
 bun install --production
+
+echo ""
+echo "🔒 Generando certificados SSL para localhost..."
+cd $INSTALL_DIR
+mkcert localhost 127.0.0.1 ::1
+echo "✅ Certificados SSL generados"
 
 echo ""
 echo "🔧 Configurando servicio systemd..."
@@ -173,11 +204,12 @@ echo "   sudo systemctl restart thermal-print  # Reiniciar"
 echo "   sudo systemctl stop thermal-print     # Detener"
 echo "   sudo journalctl -u thermal-print -f   # Ver logs en tiempo real"
 echo ""
-echo "🌐 El servicio está disponible en: http://localhost:20936"
+echo "🌐 El servicio está disponible en: https://localhost:20936"
+echo "🔒 Con certificados SSL - ¡Sin warnings en el navegador!"
+echo ""
 echo "🎯 Endpoints:"
-echo "   GET  http://localhost:20936/health"
-echo "   GET  http://localhost:20936/version"
-echo "   POST http://localhost:20936/print/ticket"
+echo "   GET  https://localhost:20936/health"
+echo "   POST https://localhost:20936/print"
 echo ""
 echo "💡 El servicio se iniciará automáticamente al arrancar el sistema"
 echo "================================================================="

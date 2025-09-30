@@ -25,27 +25,42 @@ Write-Host ""
 # Función para obtener versión instalada
 function Get-InstalledVersion {
     try {
-        $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get -TimeoutSec 2
+        # Intentar HTTPS primero
+        $response = Invoke-RestMethod -Uri "https://localhost:20936/version" -Method Get -TimeoutSec 2 -SkipCertificateCheck
         return $response.version
     } catch {
-        # Si no responde, buscar en archivos
-        if (Test-Path "$INSTALL_DIR\package.json") {
-            $packageJson = Get-Content "$INSTALL_DIR\package.json" | ConvertFrom-Json
-            return $packageJson.version
+        try {
+            # Fallback a HTTP
+            $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get -TimeoutSec 2
+            return $response.version
+        } catch {
+            # Si no responde, buscar en archivos
+            if (Test-Path "$INSTALL_DIR\package.json") {
+                $packageJson = Get-Content "$INSTALL_DIR\package.json" | ConvertFrom-Json
+                return $packageJson.version
+            }
+            return "desconocida"
         }
-        return "desconocida"
     }
 }
 
-# Verificar si el servicio está corriendo
+# Verificar si el servicio está corriendo (intentar HTTPS primero, fallback a HTTP)
 try {
-    $response = Invoke-RestMethod -Uri "http://localhost:20936/health" -Method Get -TimeoutSec 2
+    $response = Invoke-RestMethod -Uri "https://localhost:20936/health" -Method Get -TimeoutSec 2 -SkipCertificateCheck
     $ServiceRunning = $true
     $CurrentVersion = Get-InstalledVersion
-    Write-Host "✅ Servicio detectado y funcionando" -ForegroundColor Green
+    Write-Host "✅ Servicio detectado y funcionando (HTTPS)" -ForegroundColor Green
     Write-Host "   Versión actual: $CurrentVersion" -ForegroundColor Gray
 } catch {
-    Write-Host "⚠️  Servicio no está respondiendo" -ForegroundColor Yellow
+    try {
+        $response = Invoke-RestMethod -Uri "http://localhost:20936/health" -Method Get -TimeoutSec 2
+        $ServiceRunning = $true
+        $CurrentVersion = Get-InstalledVersion
+        Write-Host "✅ Servicio detectado y funcionando (HTTP)" -ForegroundColor Green
+        Write-Host "   Versión actual: $CurrentVersion" -ForegroundColor Gray
+    } catch {
+        Write-Host "⚠️  Servicio no está respondiendo" -ForegroundColor Yellow
+    }
 }
 
 # Verificar instalación del servicio Windows
@@ -226,19 +241,30 @@ Write-Host ""
 # Verificar estado final
 Write-Host "🔍 Verificando estado final del servicio..." -ForegroundColor Yellow
 try {
-    $response = Invoke-RestMethod -Uri "http://localhost:20936/health" -Method Get -TimeoutSec 2
+    $response = Invoke-RestMethod -Uri "https://localhost:20936/health" -Method Get -TimeoutSec 2 -SkipCertificateCheck
     $finalVersion = Get-InstalledVersion
 
-    Write-Host "✅ Servicio funcionando correctamente" -ForegroundColor Green
+    Write-Host "✅ Servicio funcionando correctamente (HTTPS)" -ForegroundColor Green
     Write-Host "   Versión instalada: $finalVersion" -ForegroundColor Gray
-    Write-Host "   URL: http://localhost:20936" -ForegroundColor Gray
+    Write-Host "   URL: https://localhost:20936" -ForegroundColor Gray
+    Write-Host "   🔒 Certificados SSL configurados" -ForegroundColor Gray
 } catch {
-    Write-Host "⚠️  El servicio no está respondiendo" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Intenta iniciarlo manualmente:" -ForegroundColor Yellow
-    Write-Host "   1. Busca 'Servicios' en el menú de Windows"
-    Write-Host "   2. Busca 'ThermalPrintService'"
-    Write-Host "   3. Click derecho → Iniciar"
+    try {
+        $response = Invoke-RestMethod -Uri "http://localhost:20936/health" -Method Get -TimeoutSec 2
+        $finalVersion = Get-InstalledVersion
+
+        Write-Host "✅ Servicio funcionando correctamente (HTTP)" -ForegroundColor Green
+        Write-Host "   Versión instalada: $finalVersion" -ForegroundColor Gray
+        Write-Host "   URL: http://localhost:20936" -ForegroundColor Gray
+        Write-Host "   ⚠️  Sin HTTPS - considera regenerar certificados" -ForegroundColor Yellow
+    } catch {
+        Write-Host "⚠️  El servicio no está respondiendo" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Intenta iniciarlo manualmente:" -ForegroundColor Yellow
+        Write-Host "   1. Busca 'Servicios' en el menú de Windows"
+        Write-Host "   2. Busca 'ThermalPrintService'"
+        Write-Host "   3. Click derecho → Iniciar"
+    }
 }
 
 Write-Host ""

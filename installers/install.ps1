@@ -167,14 +167,16 @@ if ($IsUpdate) {
         Write-Host "✅ Backup en $BACKUP_DIR" -ForegroundColor Green
     }
 
-    # Remove existing service (try NSSM first, then sc.exe)
+    # Remove existing service (try NSSM first, then sc.exe as fallback)
+    Write-Host ""
+    Write-Host "🗑️  Eliminando servicio anterior..." -ForegroundColor Yellow
     $existingNssm = Join-Path $INSTALL_DIR "nssm.exe"
     if (Test-Path $existingNssm) {
         & $existingNssm stop $SERVICE_NAME 2>$null
         & $existingNssm remove $SERVICE_NAME confirm 2>$null
-    } else {
-        & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>$null
     }
+    # Always try sc.exe as fallback (handles services created with New-Service)
+    & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>$null
     Start-Sleep -Seconds 2
 }
 

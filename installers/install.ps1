@@ -169,7 +169,7 @@ if ($IsUpdate) {
 
     # Remove existing service
     try {
-        & sc.exe delete $SERVICE_NAME 2>$null
+        & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>$null
         Start-Sleep -Seconds 2
     } catch {}
 }
@@ -270,9 +270,10 @@ Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Yellow
 $bunExe = (Get-Command bun).Source
 $serverJs = Join-Path $INSTALL_DIR "server.js"
 
-& sc.exe create $SERVICE_NAME binPath= "`"$bunExe`" `"$serverJs`"" start= auto DisplayName= "Thermal Print Service"
-& sc.exe description $SERVICE_NAME "Servicio local para impresión térmica ESC/POS"
-& sc.exe failure $SERVICE_NAME reset= 86400 actions= restart/5000/restart/5000/restart/5000
+$scExe = "$env:SystemRoot\System32\sc.exe"
+& $scExe create $SERVICE_NAME binPath= "`"$bunExe`" `"$serverJs`"" start= auto DisplayName= "Thermal Print Service"
+& $scExe description $SERVICE_NAME "Servicio local para impresión térmica ESC/POS"
+& $scExe failure $SERVICE_NAME reset= 86400 actions= restart/5000/restart/5000/restart/5000
 
 Write-Host "✅ Servicio de Windows configurado" -ForegroundColor Green
 
@@ -320,7 +321,7 @@ if ($service.Status -eq 'Running') {
     if ($IsUpdate -and $BACKUP_DIR) {
         Write-Host "🔄 Restaurando backup..." -ForegroundColor Yellow
         Stop-Service -Name $SERVICE_NAME -Force -ErrorAction SilentlyContinue
-        & sc.exe delete $SERVICE_NAME
+        & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME
         Remove-Item -Path $INSTALL_DIR -Recurse -Force
         Copy-Item -Path $BACKUP_DIR -Destination $INSTALL_DIR -Recurse -Force
         Write-Host "✅ Backup restaurado" -ForegroundColor Green

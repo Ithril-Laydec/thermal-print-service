@@ -167,11 +167,15 @@ if ($IsUpdate) {
         Write-Host "✅ Backup en $BACKUP_DIR" -ForegroundColor Green
     }
 
-    # Remove existing service
-    try {
+    # Remove existing service (try NSSM first, then sc.exe)
+    $existingNssm = Join-Path $INSTALL_DIR "nssm.exe"
+    if (Test-Path $existingNssm) {
+        & $existingNssm stop $SERVICE_NAME 2>$null
+        & $existingNssm remove $SERVICE_NAME confirm 2>$null
+    } else {
         & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>$null
-        Start-Sleep -Seconds 2
-    } catch {}
+    }
+    Start-Sleep -Seconds 2
 }
 
 # ============================================================
@@ -275,20 +279,57 @@ Copy-Item -Path $bunSource -Destination $bunDest -Force
 Write-Host "✅ Bun copiado" -ForegroundColor Green
 
 # ============================================================
-# CONFIGURE WINDOWS SERVICE
+# INSTALL NSSM (service wrapper)
+# ============================================================
+Write-Host ""
+Write-Host "📦 Instalando NSSM (service wrapper)..." -ForegroundColor Yellow
+$nssmPath = Join-Path $INSTALL_DIR "nssm.exe"
+
+if (-not (Test-Path $nssmPath)) {
+    $nssmZipUrl = "https://nssm.cc/release/nssm-2.24.zip"
+    $nssmZip = Join-Path $env:TEMP "nssm.zip"
+    $nssmExtract = Join-Path $env:TEMP "nssm-extract"
+
+    try {
+        Invoke-WebRequest -Uri $nssmZipUrl -OutFile $nssmZip -UseBasicParsing
+        Expand-Archive -Path $nssmZip -DestinationPath $nssmExtract -Force
+
+        # Copy the 64-bit version
+        $nssmExe = Join-Path $nssmExtract "nssm-2.24\win64\nssm.exe"
+        if (-not (Test-Path $nssmExe)) {
+            $nssmExe = Join-Path $nssmExtract "nssm-2.24\win32\nssm.exe"
+        }
+        Copy-Item -Path $nssmExe -Destination $nssmPath -Force
+
+        Remove-Item $nssmZip -Force -ErrorAction SilentlyContinue
+        Remove-Item $nssmExtract -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "✅ NSSM instalado" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Error instalando NSSM: $_" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "✅ NSSM ya existe" -ForegroundColor Green
+}
+
+# ============================================================
+# CONFIGURE WINDOWS SERVICE (using NSSM)
 # ============================================================
 Write-Host ""
 Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Yellow
 
-$bunExe = $bunDest
 $serverJs = Join-Path $INSTALL_DIR "server.js"
-$binPath = "`"$bunExe`" `"$serverJs`""
 
-New-Service -Name $SERVICE_NAME -BinaryPathName $binPath -DisplayName "Thermal Print Service" -Description "Servicio local para impresión térmica ESC/POS" -StartupType Automatic
-
-# Configure failure recovery
-$scExe = "$env:SystemRoot\System32\sc.exe"
-& $scExe failure $SERVICE_NAME reset= 86400 actions= restart/5000/restart/5000/restart/5000 2>$null
+# Install service with NSSM
+& $nssmPath install $SERVICE_NAME $bunDest $serverJs 2>$null
+& $nssmPath set $SERVICE_NAME AppDirectory $INSTALL_DIR 2>$null
+& $nssmPath set $SERVICE_NAME DisplayName "Thermal Print Service" 2>$null
+& $nssmPath set $SERVICE_NAME Description "Servicio local para impresión térmica ESC/POS" 2>$null
+& $nssmPath set $SERVICE_NAME Start SERVICE_AUTO_START 2>$null
+& $nssmPath set $SERVICE_NAME AppStdout (Join-Path $INSTALL_DIR "service.log") 2>$null
+& $nssmPath set $SERVICE_NAME AppStderr (Join-Path $INSTALL_DIR "service-error.log") 2>$null
+& $nssmPath set $SERVICE_NAME AppRotateFiles 1 2>$null
+& $nssmPath set $SERVICE_NAME AppRotateBytes 1048576 2>$null
 
 Write-Host "✅ Servicio de Windows configurado" -ForegroundColor Green
 
@@ -335,8 +376,14 @@ if ($service.Status -eq 'Running') {
 
     if ($IsUpdate -and $BACKUP_DIR) {
         Write-Host "🔄 Restaurando backup..." -ForegroundColor Yellow
-        Stop-Service -Name $SERVICE_NAME -Force -ErrorAction SilentlyContinue
-        & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME
+        # Remove service using nssm if available
+        if (Test-Path $nssmPath) {
+            & $nssmPath stop $SERVICE_NAME 2>$null
+            & $nssmPath remove $SERVICE_NAME confirm 2>$null
+        } else {
+            Stop-Service -Name $SERVICE_NAME -Force -ErrorAction SilentlyContinue
+            & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>$null
+        }
         Remove-Item -Path $INSTALL_DIR -Recurse -Force
         Copy-Item -Path $BACKUP_DIR -Destination $INSTALL_DIR -Recurse -Force
         Write-Host "✅ Backup restaurado" -ForegroundColor Green

@@ -16,7 +16,7 @@ if (-not $isAdmin) {
     try {
         Invoke-WebRequest -Uri $scriptUrl -OutFile $tempScript -UseBasicParsing
         # Use -NoExit to keep window open, or add pause at end
-        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -Command `"& '$tempScript'; Write-Host ''; Write-Host 'Presiona cualquier tecla para cerrar...' -ForegroundColor Cyan; `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')`"" -Verb RunAs -Wait
+        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$tempScript`"" -Verb RunAs -Wait
         Remove-Item $tempScript -Force -ErrorAction SilentlyContinue
     } catch {
         Write-Host "❌ Error: Se requieren permisos de administrador" -ForegroundColor Red
@@ -335,3 +335,6 @@ Write-Host "   Restart-Service ThermalPrintService"
 Write-Host ""
 Write-Host "🌐 URL: https://localhost:20936" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Presiona cualquier tecla para cerrar..." -ForegroundColor Gray
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

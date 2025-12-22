@@ -286,53 +286,21 @@ Copy-Item -Path $bunSource -Destination $bunDest -Force
 Write-Host "✅ Bun copiado" -ForegroundColor Green
 
 # ============================================================
-# INSTALL NSSM (service wrapper)
+# INSTALL NSSM (service wrapper) - bundled in repo
 # ============================================================
 Write-Host ""
 Write-Host "📦 Instalando NSSM (service wrapper)..." -ForegroundColor Yellow
 $nssmPath = Join-Path $INSTALL_DIR "nssm.exe"
 
 if (-not (Test-Path $nssmPath)) {
-    # Multiple mirrors for resilience (nssm.cc is often down)
-    $nssmUrls = @(
-        "https://github.com/nickstenning/nssm/releases/download/2.24/nssm-2.24.zip",
-        "https://nssm.cc/release/nssm-2.24.zip"
-    )
-    $nssmZip = Join-Path $env:TEMP "nssm.zip"
-    $nssmExtract = Join-Path $env:TEMP "nssm-extract"
-    $downloaded = $false
-
-    foreach ($nssmZipUrl in $nssmUrls) {
-        try {
-            Write-Host "   Probando: $nssmZipUrl" -ForegroundColor Gray
-            Invoke-WebRequest -Uri $nssmZipUrl -OutFile $nssmZip -UseBasicParsing -TimeoutSec 30
-            $downloaded = $true
-            break
-        } catch {
-            Write-Host "   ⚠️  Mirror no disponible" -ForegroundColor Yellow
-        }
-    }
-
-    if (-not $downloaded) {
-        Write-Host "❌ No se pudo descargar NSSM de ningún mirror" -ForegroundColor Red
-        exit 1
-    }
-
-    try {
-        Expand-Archive -Path $nssmZip -DestinationPath $nssmExtract -Force
-
-        # Copy the 64-bit version
-        $nssmExe = Join-Path $nssmExtract "nssm-2.24\win64\nssm.exe"
-        if (-not (Test-Path $nssmExe)) {
-            $nssmExe = Join-Path $nssmExtract "nssm-2.24\win32\nssm.exe"
-        }
-        Copy-Item -Path $nssmExe -Destination $nssmPath -Force
-
-        Remove-Item $nssmZip -Force -ErrorAction SilentlyContinue
-        Remove-Item $nssmExtract -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "✅ NSSM instalado" -ForegroundColor Green
-    } catch {
-        Write-Host "❌ Error instalando NSSM: $_" -ForegroundColor Red
+    # NSSM is bundled in the downloaded release - should already be in installers/bin/
+    $bundledNssm = Join-Path $INSTALL_DIR "installers\bin\nssm.exe"
+    if (Test-Path $bundledNssm) {
+        Copy-Item -Path $bundledNssm -Destination $nssmPath -Force
+        Write-Host "✅ NSSM instalado (bundled)" -ForegroundColor Green
+    } else {
+        Write-Host "❌ NSSM no encontrado en el paquete" -ForegroundColor Red
+        Write-Host "   Esperado en: $bundledNssm" -ForegroundColor Gray
         exit 1
     }
 } else {

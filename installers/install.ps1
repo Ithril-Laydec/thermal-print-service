@@ -269,11 +269,13 @@ Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Yellow
 
 $bunExe = (Get-Command bun).Source
 $serverJs = Join-Path $INSTALL_DIR "server.js"
+$binPath = "`"$bunExe`" `"$serverJs`""
 
+New-Service -Name $SERVICE_NAME -BinaryPathName $binPath -DisplayName "Thermal Print Service" -Description "Servicio local para impresión térmica ESC/POS" -StartupType Automatic
+
+# Configure failure recovery
 $scExe = "$env:SystemRoot\System32\sc.exe"
-& $scExe create $SERVICE_NAME binPath= "`"$bunExe`" `"$serverJs`"" start= auto DisplayName= "Thermal Print Service"
-& $scExe description $SERVICE_NAME "Servicio local para impresión térmica ESC/POS"
-& $scExe failure $SERVICE_NAME reset= 86400 actions= restart/5000/restart/5000/restart/5000
+& $scExe failure $SERVICE_NAME reset= 86400 actions= restart/5000/restart/5000/restart/5000 2>$null
 
 Write-Host "✅ Servicio de Windows configurado" -ForegroundColor Green
 

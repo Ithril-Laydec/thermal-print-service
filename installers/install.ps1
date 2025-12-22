@@ -15,7 +15,8 @@ if (-not $isAdmin) {
 
     try {
         Invoke-WebRequest -Uri $scriptUrl -OutFile $tempScript -UseBasicParsing
-        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$tempScript`"" -Verb RunAs -Wait
+        # Use -NoExit to keep window open, or add pause at end
+        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -Command `"& '$tempScript'; Write-Host ''; Write-Host 'Presiona cualquier tecla para cerrar...' -ForegroundColor Cyan; `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')`"" -Verb RunAs -Wait
         Remove-Item $tempScript -Force -ErrorAction SilentlyContinue
     } catch {
         Write-Host "❌ Error: Se requieren permisos de administrador" -ForegroundColor Red

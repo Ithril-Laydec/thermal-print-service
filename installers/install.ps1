@@ -211,6 +211,9 @@ try {
 Write-Host ""
 Write-Host "📦 Instalando en $INSTALL_DIR..." -ForegroundColor Yellow
 
+# Change directory to avoid "directory in use" error
+Set-Location $env:SystemRoot
+
 if (Test-Path $INSTALL_DIR) {
     Remove-Item -Path $INSTALL_DIR -Recurse -Force
 }

@@ -1,7 +1,28 @@
 # Thermal Print Service - Unified Installer/Updater for Windows
 # Automatically detects whether to install or update
 
-#Requires -RunAsAdministrator
+# ============================================================
+# AUTO-ELEVATION: Request admin privileges if not running as admin
+# ============================================================
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if (-not $isAdmin) {
+    Write-Host "🔐 Solicitando permisos de administrador..." -ForegroundColor Yellow
+
+    # Download script to temp file and relaunch elevated
+    $scriptUrl = "https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.ps1"
+    $tempScript = "$env:TEMP\thermal-print-install.ps1"
+
+    try {
+        Invoke-WebRequest -Uri $scriptUrl -OutFile $tempScript -UseBasicParsing
+        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$tempScript`"" -Verb RunAs -Wait
+        Remove-Item $tempScript -Force -ErrorAction SilentlyContinue
+    } catch {
+        Write-Host "❌ Error: Se requieren permisos de administrador" -ForegroundColor Red
+        Write-Host "   Ejecuta PowerShell como Administrador e intenta de nuevo" -ForegroundColor Yellow
+    }
+    exit
+}
 
 Write-Host ""
 Write-Host "🖨️  Servicio de Impresión Térmica - Windows" -ForegroundColor Cyan

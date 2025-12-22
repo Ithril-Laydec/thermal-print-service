@@ -265,12 +265,22 @@ try {
 }
 
 # ============================================================
+# COPY BUN TO INSTALL DIR (so SYSTEM account can access it)
+# ============================================================
+Write-Host ""
+Write-Host "📦 Copiando Bun al directorio de instalación..." -ForegroundColor Yellow
+$bunSource = (Get-Command bun).Source
+$bunDest = Join-Path $INSTALL_DIR "bun.exe"
+Copy-Item -Path $bunSource -Destination $bunDest -Force
+Write-Host "✅ Bun copiado" -ForegroundColor Green
+
+# ============================================================
 # CONFIGURE WINDOWS SERVICE
 # ============================================================
 Write-Host ""
 Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Yellow
 
-$bunExe = (Get-Command bun).Source
+$bunExe = $bunDest
 $serverJs = Join-Path $INSTALL_DIR "server.js"
 $binPath = "`"$bunExe`" `"$serverJs`""
 

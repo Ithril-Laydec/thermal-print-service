@@ -1,6 +1,9 @@
 # Thermal Print Service - Unified Installer/Updater for Windows
 # Automatically detects whether to install or update
 
+# Ensure stderr from native commands doesn't terminate the script
+$ErrorActionPreference = 'Continue'
+
 # ============================================================
 # AUTO-ELEVATION: Request admin privileges if not running as admin
 # ============================================================

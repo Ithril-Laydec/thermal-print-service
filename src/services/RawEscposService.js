@@ -21,7 +21,8 @@ async function printWithRawBuffer(buffer) {
 }
 
 /**
- * Impresión en Windows usando PowerShell y la API de Windows
+ * Impresión en Windows usando copy /b al share local de la impresora
+ * Requiere que la impresora esté compartida en Windows
  */
 async function printWindows(buffer) {
   const tempFile = path.join(os.tmpdir(), `thermal-${Date.now()}.bin`)
@@ -31,84 +32,11 @@ async function printWindows(buffer) {
     fs.writeFileSync(tempFile, buffer)
     console.log(`📄 Archivo temporal: ${tempFile} (${buffer.length} bytes)`)
 
-    // PowerShell script para enviar RAW data a la impresora
-    const psScript = `
-      $printerName = '${WINDOWS_PRINTER_NAME}'
-      $filePath = '${tempFile.replace(/\\/g, '\\\\')}'
-
-      Add-Type -TypeDefinition @"
-        using System;
-        using System.Runtime.InteropServices;
-
-        public class RawPrinter {
-          [StructLayout(LayoutKind.Sequential)]
-          public struct DOCINFOA {
-            [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
-            [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
-            [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
-          }
-
-          [DllImport("winspool.drv", EntryPoint = "OpenPrinterA", SetLastError = true, CharSet = CharSet.Ansi)]
-          public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
-
-          [DllImport("winspool.drv", EntryPoint = "ClosePrinter", SetLastError = true)]
-          public static extern bool ClosePrinter(IntPtr hPrinter);
-
-          [DllImport("winspool.drv", EntryPoint = "StartDocPrinterA", SetLastError = true, CharSet = CharSet.Ansi)]
-          public static extern bool StartDocPrinter(IntPtr hPrinter, int Level, ref DOCINFOA pDocInfo);
-
-          [DllImport("winspool.drv", EntryPoint = "EndDocPrinter", SetLastError = true)]
-          public static extern bool EndDocPrinter(IntPtr hPrinter);
-
-          [DllImport("winspool.drv", EntryPoint = "StartPagePrinter", SetLastError = true)]
-          public static extern bool StartPagePrinter(IntPtr hPrinter);
-
-          [DllImport("winspool.drv", EntryPoint = "EndPagePrinter", SetLastError = true)]
-          public static extern bool EndPagePrinter(IntPtr hPrinter);
-
-          [DllImport("winspool.drv", EntryPoint = "WritePrinter", SetLastError = true)]
-          public static extern bool WritePrinter(IntPtr hPrinter, byte[] pBytes, int dwCount, out int dwWritten);
-
-          public static bool SendRawData(string printerName, byte[] data) {
-            IntPtr hPrinter = IntPtr.Zero;
-            DOCINFOA di = new DOCINFOA();
-            di.pDocName = "Thermal Ticket";
-            di.pDataType = "RAW";
-
-            if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) return false;
-
-            try {
-              if (!StartDocPrinter(hPrinter, 1, ref di)) return false;
-              if (!StartPagePrinter(hPrinter)) return false;
-
-              int written = 0;
-              bool success = WritePrinter(hPrinter, data, data.Length, out written);
-
-              EndPagePrinter(hPrinter);
-              EndDocPrinter(hPrinter);
-
-              return success && written == data.Length;
-            } finally {
-              ClosePrinter(hPrinter);
-            }
-          }
-        }
-"@
-
-      $bytes = [System.IO.File]::ReadAllBytes($filePath)
-      $result = [RawPrinter]::SendRawData($printerName, $bytes)
-
-      if ($result) {
-        Write-Output "OK"
-      } else {
-        throw "Error al enviar datos a la impresora"
-      }
-    `
-
-    // Ejecutar PowerShell
-    const result = execSync(`powershell -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, {
+    // Enviar directo al share local de la impresora
+    execSync(`copy /b "${tempFile}" "\\\\localhost\\${WINDOWS_PRINTER_NAME}"`, {
       encoding: 'utf8',
-      timeout: 30000
+      timeout: 10000,
+      shell: true
     })
 
     console.log(`✅ Impresión en Windows: ${WINDOWS_PRINTER_NAME}`)

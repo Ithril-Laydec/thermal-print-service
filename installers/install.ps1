@@ -172,11 +172,11 @@ if ($IsUpdate) {
     Write-Host "🗑️  Eliminando servicio anterior..." -ForegroundColor Yellow
     $existingNssm = Join-Path $INSTALL_DIR "nssm.exe"
     if (Test-Path $existingNssm) {
-        & $existingNssm stop $SERVICE_NAME 2>$null
-        & $existingNssm remove $SERVICE_NAME confirm 2>$null
+        $null = & $existingNssm stop $SERVICE_NAME 2>&1
+        $null = & $existingNssm remove $SERVICE_NAME confirm 2>&1
     }
     # Always try sc.exe as fallback (handles services created with New-Service)
-    & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>$null
+    $null = & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>&1
     Start-Sleep -Seconds 2
 }
 
@@ -322,16 +322,16 @@ Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Yellow
 
 $serverJs = Join-Path $INSTALL_DIR "server.js"
 
-# Install service with NSSM
-& $nssmPath install $SERVICE_NAME $bunDest $serverJs 2>$null
-& $nssmPath set $SERVICE_NAME AppDirectory $INSTALL_DIR 2>$null
-& $nssmPath set $SERVICE_NAME DisplayName "Thermal Print Service" 2>$null
-& $nssmPath set $SERVICE_NAME Description "Servicio local para impresión térmica ESC/POS" 2>$null
-& $nssmPath set $SERVICE_NAME Start SERVICE_AUTO_START 2>$null
-& $nssmPath set $SERVICE_NAME AppStdout (Join-Path $INSTALL_DIR "service.log") 2>$null
-& $nssmPath set $SERVICE_NAME AppStderr (Join-Path $INSTALL_DIR "service-error.log") 2>$null
-& $nssmPath set $SERVICE_NAME AppRotateFiles 1 2>$null
-& $nssmPath set $SERVICE_NAME AppRotateBytes 1048576 2>$null
+# Install service with NSSM (suppress all output)
+$null = & $nssmPath install $SERVICE_NAME $bunDest $serverJs 2>&1
+$null = & $nssmPath set $SERVICE_NAME AppDirectory $INSTALL_DIR 2>&1
+$null = & $nssmPath set $SERVICE_NAME DisplayName "Thermal Print Service" 2>&1
+$null = & $nssmPath set $SERVICE_NAME Description "Servicio local para impresión térmica ESC/POS" 2>&1
+$null = & $nssmPath set $SERVICE_NAME Start SERVICE_AUTO_START 2>&1
+$null = & $nssmPath set $SERVICE_NAME AppStdout (Join-Path $INSTALL_DIR "service.log") 2>&1
+$null = & $nssmPath set $SERVICE_NAME AppStderr (Join-Path $INSTALL_DIR "service-error.log") 2>&1
+$null = & $nssmPath set $SERVICE_NAME AppRotateFiles 1 2>&1
+$null = & $nssmPath set $SERVICE_NAME AppRotateBytes 1048576 2>&1
 
 Write-Host "✅ Servicio de Windows configurado" -ForegroundColor Green
 
@@ -413,11 +413,11 @@ if ($service.Status -eq 'Running') {
         Write-Host "🔄 Restaurando backup..." -ForegroundColor Yellow
         # Remove service using nssm if available
         if (Test-Path $nssmPath) {
-            & $nssmPath stop $SERVICE_NAME 2>$null
-            & $nssmPath remove $SERVICE_NAME confirm 2>$null
+            $null = & $nssmPath stop $SERVICE_NAME 2>&1
+            $null = & $nssmPath remove $SERVICE_NAME confirm 2>&1
         } else {
             Stop-Service -Name $SERVICE_NAME -Force -ErrorAction SilentlyContinue
-            & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>$null
+            $null = & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>&1
         }
         Remove-Item -Path $INSTALL_DIR -Recurse -Force
         Copy-Item -Path $BACKUP_DIR -Destination $INSTALL_DIR -Recurse -Force

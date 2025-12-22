@@ -244,9 +244,10 @@ Write-Host "📦 Instalando dependencias..." -ForegroundColor Yellow
 Set-Location $INSTALL_DIR
 Remove-Item -Path "package-lock.json" -ErrorAction SilentlyContinue
 Remove-Item -Path "bun.lockb" -ErrorAction SilentlyContinue
-& bun install --production
 
-if ($LASTEXITCODE -ne 0) {
+# Use cmd.exe to run bun to bypass PowerShell stderr handling
+$bunResult = Start-Process -FilePath "cmd.exe" -ArgumentList "/c bun install --production" -Wait -NoNewWindow -PassThru
+if ($bunResult.ExitCode -ne 0) {
     Write-Host "❌ Error instalando dependencias" -ForegroundColor Red
     if ($IsUpdate -and $BACKUP_DIR) {
         Write-Host "🔄 Restaurando backup..." -ForegroundColor Yellow

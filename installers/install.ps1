@@ -340,8 +340,41 @@ Write-Host "✅ Servicio de Windows configurado" -ForegroundColor Green
 # ============================================================
 Write-Host ""
 Write-Host "🚀 Iniciando servicio..." -ForegroundColor Yellow
-Start-Service -Name $SERVICE_NAME
-Start-Sleep -Seconds 3
+try {
+    Start-Service -Name $SERVICE_NAME -ErrorAction Stop
+    Start-Sleep -Seconds 3
+} catch {
+    Write-Host "❌ Error al iniciar servicio: $_" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "📋 Diagnóstico:" -ForegroundColor Yellow
+
+    # Check if files exist
+    Write-Host "   Archivos en $INSTALL_DIR`:" -ForegroundColor Gray
+    Get-ChildItem $INSTALL_DIR -Name | ForEach-Object { Write-Host "   - $_" -ForegroundColor Gray }
+
+    # Check error log
+    $errorLog = Join-Path $INSTALL_DIR "service-error.log"
+    if (Test-Path $errorLog) {
+        Write-Host ""
+        Write-Host "   Log de errores:" -ForegroundColor Gray
+        Get-Content $errorLog -Tail 10 | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
+    }
+
+    # Try to run bun directly to see the error
+    Write-Host ""
+    Write-Host "   Intentando ejecutar bun directamente..." -ForegroundColor Gray
+    Set-Location $INSTALL_DIR
+    $process = Start-Process -FilePath $bunDest -ArgumentList $serverJs -PassThru -NoNewWindow -Wait -RedirectStandardError "$env:TEMP\bun-error.txt"
+    if (Test-Path "$env:TEMP\bun-error.txt") {
+        $bunError = Get-Content "$env:TEMP\bun-error.txt" -Raw
+        if ($bunError) {
+            Write-Host "   Error de Bun:" -ForegroundColor Red
+            Write-Host "   $bunError" -ForegroundColor Red
+        }
+        Remove-Item "$env:TEMP\bun-error.txt" -ErrorAction SilentlyContinue
+    }
+    exit 1
+}
 
 # ============================================================
 # VERIFY

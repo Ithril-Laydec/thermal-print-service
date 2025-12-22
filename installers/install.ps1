@@ -7,19 +7,25 @@
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 if (-not $isAdmin) {
-    Write-Host "🔐 Solicitando permisos de administrador..." -ForegroundColor Yellow
+    Write-Host "Solicitando permisos de administrador..." -ForegroundColor Yellow
 
-    # Download script to temp file and relaunch elevated
     $scriptUrl = "https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.ps1"
     $tempScript = "$env:TEMP\thermal-print-install.ps1"
 
     try {
-        Invoke-WebRequest -Uri $scriptUrl -OutFile $tempScript -UseBasicParsing
-        # Execute in a way that keeps window open even on exit/errors
-        Start-Process powershell.exe -ArgumentList "-NoExit -ExecutionPolicy Bypass -Command `"& { . '$tempScript' }`"" -Verb RunAs -Wait
+        # Download with proper UTF-8 encoding
+        $response = Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing
+        [System.IO.File]::WriteAllText($tempScript, $response.Content, [System.Text.Encoding]::UTF8)
+
+        # Use EncodedCommand to avoid all escaping issues with special characters
+        $command = ". '$tempScript'"
+        $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+        $encodedCommand = [Convert]::ToBase64String($bytes)
+
+        Start-Process powershell.exe -ArgumentList "-NoExit -ExecutionPolicy Bypass -EncodedCommand $encodedCommand" -Verb RunAs -Wait
         Remove-Item $tempScript -Force -ErrorAction SilentlyContinue
     } catch {
-        Write-Host "❌ Error: Se requieren permisos de administrador" -ForegroundColor Red
+        Write-Host "Error: Se requieren permisos de administrador" -ForegroundColor Red
         Write-Host "   Ejecuta PowerShell como Administrador e intenta de nuevo" -ForegroundColor Yellow
     }
     exit

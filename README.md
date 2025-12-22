@@ -24,13 +24,13 @@ Servicio minimalista para impresión térmica ESC/POS con soporte HTTPS.
 ### Linux (Ubuntu/Debian)
 
 ```bash
-curl -fsSL https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install-or-update.sh | bash
+curl -fsSL https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.sh | bash
 ```
 
 ### Windows (PowerShell como Administrador)
 
 ```powershell
-irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install-or-update.ps1 | iex
+irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.ps1 | iex
 ```
 
 ✨ **Qué hace automáticamente:**

@@ -328,7 +328,9 @@ Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Yellow
 $serverJs = Join-Path $INSTALL_DIR "server.js"
 
 # Install service with NSSM (suppress all output)
-try { & $nssmPath install $SERVICE_NAME $bunDest $serverJs 2>&1 | Out-Null } catch {}
+# Use AppParameters separately to handle paths with spaces correctly
+try { & $nssmPath install $SERVICE_NAME $bunDest 2>&1 | Out-Null } catch {}
+try { & $nssmPath set $SERVICE_NAME AppParameters "`"$serverJs`"" 2>&1 | Out-Null } catch {}
 try { & $nssmPath set $SERVICE_NAME AppDirectory $INSTALL_DIR 2>&1 | Out-Null } catch {}
 try { & $nssmPath set $SERVICE_NAME DisplayName "Thermal Print Service" 2>&1 | Out-Null } catch {}
 try { & $nssmPath set $SERVICE_NAME Description "Servicio local para impresión térmica ESC/POS" 2>&1 | Out-Null } catch {}

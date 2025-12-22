@@ -170,11 +170,15 @@ if ($IsUpdate) {
         Write-Host "✅ Backup en $BACKUP_DIR" -ForegroundColor Green
     }
 
-    # Remove existing service (try NSSM first, then sc.exe as fallback)
+    # Remove existing service (try WinSW first, then NSSM, then sc.exe as fallback)
     Write-Host ""
     Write-Host "🗑️  Eliminando servicio anterior..." -ForegroundColor Yellow
+    $existingWinSW = Join-Path $INSTALL_DIR "ThermalPrintService.exe"
     $existingNssm = Join-Path $INSTALL_DIR "nssm.exe"
-    if (Test-Path $existingNssm) {
+    if (Test-Path $existingWinSW) {
+        try { & $existingWinSW stop 2>&1 | Out-Null } catch {}
+        try { & $existingWinSW uninstall 2>&1 | Out-Null } catch {}
+    } elseif (Test-Path $existingNssm) {
         try { & $existingNssm stop $SERVICE_NAME 2>&1 | Out-Null } catch {}
         try { & $existingNssm remove $SERVICE_NAME confirm 2>&1 | Out-Null } catch {}
     }
@@ -286,49 +290,41 @@ Copy-Item -Path $bunSource -Destination $bunDest -Force
 Write-Host "✅ Bun copiado" -ForegroundColor Green
 
 # ============================================================
-# INSTALL NSSM (service wrapper) - bundled in repo
+# INSTALL WinSW (service wrapper) - bundled in repo
 # ============================================================
 Write-Host ""
-Write-Host "📦 Instalando NSSM (service wrapper)..." -ForegroundColor Yellow
-$nssmPath = Join-Path $INSTALL_DIR "nssm.exe"
+Write-Host "📦 Instalando WinSW (service wrapper)..." -ForegroundColor Yellow
+$winswPath = Join-Path $INSTALL_DIR "ThermalPrintService.exe"
+$winswXml = Join-Path $INSTALL_DIR "ThermalPrintService.xml"
 
-if (-not (Test-Path $nssmPath)) {
-    # NSSM is bundled in the downloaded release - should already be in installers/bin/
-    $bundledNssm = Join-Path $INSTALL_DIR "installers\bin\nssm.exe"
-    if (Test-Path $bundledNssm) {
-        Copy-Item -Path $bundledNssm -Destination $nssmPath -Force
-        Write-Host "✅ NSSM instalado (bundled)" -ForegroundColor Green
-    } else {
-        Write-Host "❌ NSSM no encontrado en el paquete" -ForegroundColor Red
-        Write-Host "   Esperado en: $bundledNssm" -ForegroundColor Gray
-        exit 1
-    }
+# Copy WinSW executable (renamed to service name)
+$bundledWinSW = Join-Path $INSTALL_DIR "installers\bin\WinSW.exe"
+$bundledXml = Join-Path $INSTALL_DIR "installers\bin\ThermalPrintService.xml"
+
+if (Test-Path $bundledWinSW) {
+    Copy-Item -Path $bundledWinSW -Destination $winswPath -Force
+    Copy-Item -Path $bundledXml -Destination $winswXml -Force
+    Write-Host "✅ WinSW instalado" -ForegroundColor Green
 } else {
-    Write-Host "✅ NSSM ya existe" -ForegroundColor Green
+    Write-Host "❌ WinSW no encontrado en el paquete" -ForegroundColor Red
+    Write-Host "   Esperado en: $bundledWinSW" -ForegroundColor Gray
+    exit 1
 }
 
 # ============================================================
-# CONFIGURE WINDOWS SERVICE (using NSSM)
+# CONFIGURE WINDOWS SERVICE (using WinSW)
 # ============================================================
 Write-Host ""
 Write-Host "🔧 Configurando servicio de Windows..." -ForegroundColor Yellow
 
-$serverJs = Join-Path $INSTALL_DIR "server.js"
-
-# Install service with NSSM (suppress all output)
-# Use AppParameters separately to handle paths with spaces correctly
-try { & $nssmPath install $SERVICE_NAME $bunDest 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME AppParameters "`"$serverJs`"" 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME AppDirectory $INSTALL_DIR 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME DisplayName "Thermal Print Service" 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME Description "Servicio local para impresión térmica ESC/POS" 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME Start SERVICE_AUTO_START 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME AppStdout (Join-Path $INSTALL_DIR "service.log") 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME AppStderr (Join-Path $INSTALL_DIR "service-error.log") 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME AppRotateFiles 1 2>&1 | Out-Null } catch {}
-try { & $nssmPath set $SERVICE_NAME AppRotateBytes 1048576 2>&1 | Out-Null } catch {}
-
-Write-Host "✅ Servicio de Windows configurado" -ForegroundColor Green
+# Install service with WinSW
+try {
+    & $winswPath install 2>&1 | Out-Null
+    Write-Host "✅ Servicio de Windows configurado" -ForegroundColor Green
+} catch {
+    Write-Host "❌ Error configurando servicio: $_" -ForegroundColor Red
+    exit 1
+}
 
 # ============================================================
 # START SERVICE
@@ -406,10 +402,10 @@ if ($service.Status -eq 'Running') {
 
     if ($IsUpdate -and $BACKUP_DIR) {
         Write-Host "🔄 Restaurando backup..." -ForegroundColor Yellow
-        # Remove service using nssm if available
-        if (Test-Path $nssmPath) {
-            try { & $nssmPath stop $SERVICE_NAME 2>&1 | Out-Null } catch {}
-            try { & $nssmPath remove $SERVICE_NAME confirm 2>&1 | Out-Null } catch {}
+        # Remove service using WinSW if available
+        if (Test-Path $winswPath) {
+            try { & $winswPath stop 2>&1 | Out-Null } catch {}
+            try { & $winswPath uninstall 2>&1 | Out-Null } catch {}
         } else {
             Stop-Service -Name $SERVICE_NAME -Force -ErrorAction SilentlyContinue
             try { & "$env:SystemRoot\System32\sc.exe" delete $SERVICE_NAME 2>&1 | Out-Null } catch {}

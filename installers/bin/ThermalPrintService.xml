@@ -1,0 +1,16 @@
+<service>
+  <id>ThermalPrintService</id>
+  <name>Thermal Print Service</name>
+  <description>Servicio local para impresión térmica ESC/POS</description>
+  <executable>%BASE%\bun.exe</executable>
+  <arguments>"%BASE%\server.js"</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <log mode="roll-by-size">
+    <sizeThreshold>1048576</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+  <startmode>Automatic</startmode>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <onfailure action="none"/>
+</service>

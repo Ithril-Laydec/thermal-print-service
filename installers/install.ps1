@@ -293,12 +293,32 @@ Write-Host "📦 Instalando NSSM (service wrapper)..." -ForegroundColor Yellow
 $nssmPath = Join-Path $INSTALL_DIR "nssm.exe"
 
 if (-not (Test-Path $nssmPath)) {
-    $nssmZipUrl = "https://nssm.cc/release/nssm-2.24.zip"
+    # Multiple mirrors for resilience (nssm.cc is often down)
+    $nssmUrls = @(
+        "https://github.com/nickstenning/nssm/releases/download/2.24/nssm-2.24.zip",
+        "https://nssm.cc/release/nssm-2.24.zip"
+    )
     $nssmZip = Join-Path $env:TEMP "nssm.zip"
     $nssmExtract = Join-Path $env:TEMP "nssm-extract"
+    $downloaded = $false
+
+    foreach ($nssmZipUrl in $nssmUrls) {
+        try {
+            Write-Host "   Probando: $nssmZipUrl" -ForegroundColor Gray
+            Invoke-WebRequest -Uri $nssmZipUrl -OutFile $nssmZip -UseBasicParsing -TimeoutSec 30
+            $downloaded = $true
+            break
+        } catch {
+            Write-Host "   ⚠️  Mirror no disponible" -ForegroundColor Yellow
+        }
+    }
+
+    if (-not $downloaded) {
+        Write-Host "❌ No se pudo descargar NSSM de ningún mirror" -ForegroundColor Red
+        exit 1
+    }
 
     try {
-        Invoke-WebRequest -Uri $nssmZipUrl -OutFile $nssmZip -UseBasicParsing
         Expand-Archive -Path $nssmZip -DestinationPath $nssmExtract -Force
 
         # Copy the 64-bit version

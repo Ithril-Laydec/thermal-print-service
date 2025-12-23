@@ -11,9 +11,10 @@ const app = express()
 
 // Middleware
 app.use(cors())
+app.options('*', cors()) // Habilitar preflight para todas las rutas
+app.use(express.json())
 app.post('/print-thermal', express.raw({ type: '*/*', limit: '10mb' }), printRaw)
 app.post('/print-pickup', express.raw({ type: '*/*', limit: '10mb' }), printPickup)
-app.use(express.json())
 
 // Health check
 app.get('/health', (req, res) => {

@@ -10,6 +10,10 @@
     <keepFiles>3</keepFiles>
   </log>
   <startmode>Automatic</startmode>
+  <serviceaccount>
+    <username>NT AUTHORITY\NetworkService</username>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
   <onfailure action="restart" delay="10 sec"/>
   <onfailure action="restart" delay="20 sec"/>
   <onfailure action="none"/>

@@ -23,6 +23,7 @@ async function printWithRawBuffer(buffer) {
 /**
  * Impresión en Windows usando copy /b al share local de la impresora
  * Requiere que la impresora esté compartida en Windows
+ * El servicio debe correr como NetworkService (no SYSTEM) para acceder al share
  */
 async function printWindows(buffer) {
   const tempFile = path.join(os.tmpdir(), `thermal-${Date.now()}.bin`)
@@ -30,20 +31,20 @@ async function printWindows(buffer) {
   try {
     // Escribir buffer a archivo temporal
     fs.writeFileSync(tempFile, buffer)
-    console.log(`📄 Archivo temporal: ${tempFile} (${buffer.length} bytes)`)
+    console.log(`Archivo temporal: ${tempFile} (${buffer.length} bytes)`)
 
-    // Enviar directo al share local de la impresora
-    execSync(`copy /b "${tempFile}" "\\\\localhost\\${WINDOWS_PRINTER_NAME}"`, {
+    // Enviar al share local de la impresora usando cmd.exe
+    execSync(`cmd /c copy /b "${tempFile}" "\\\\localhost\\${WINDOWS_PRINTER_NAME}"`, {
       encoding: 'utf8',
-      timeout: 10000,
-      shell: true
+      timeout: 30000,
+      windowsHide: true
     })
 
-    console.log(`✅ Impresión en Windows: ${WINDOWS_PRINTER_NAME}`)
+    console.log(`Impresion en Windows: ${WINDOWS_PRINTER_NAME}`)
     return WINDOWS_PRINTER_NAME
 
   } catch (error) {
-    console.error('❌ Error Windows:', error.message)
+    console.error('Error Windows:', error.message)
     throw new Error(`Error imprimiendo en Windows: ${error.message}`)
   } finally {
     // Limpiar archivo temporal

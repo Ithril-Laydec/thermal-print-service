@@ -304,6 +304,11 @@ $bundledXml = Join-Path $INSTALL_DIR "installers\bin\ThermalPrintService.xml"
 if (Test-Path $bundledWinSW) {
     Copy-Item -Path $bundledWinSW -Destination $winswPath -Force
     Copy-Item -Path $bundledXml -Destination $winswXml -Force
+    # Copy RawPrint.exe for native printer access
+    $bundledRawPrint = Join-Path $INSTALL_DIR "installers\bin\RawPrint.exe"
+    if (Test-Path $bundledRawPrint) {
+        Copy-Item -Path $bundledRawPrint -Destination (Join-Path $INSTALL_DIR "RawPrint.exe") -Force
+    }
     Write-Host "✅ WinSW instalado" -ForegroundColor Green
 } else {
     Write-Host "❌ WinSW no encontrado en el paquete" -ForegroundColor Red

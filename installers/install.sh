@@ -165,6 +165,34 @@ sudo usermod -a -G lp $USER
 echo -e "${GREEN}✅ Usuario añadido al grupo lp${NC}"
 
 # ============================================================
+# UDEV RULES (printer symlinks)
+# ============================================================
+echo ""
+echo "🔧 Configurando reglas udev para impresoras..."
+UDEV_RULES_FILE="/etc/udev/rules.d/99-thermal-print.rules"
+
+sudo tee $UDEV_RULES_FILE > /dev/null <<'UDEVRULES'
+# Thermal Print Service - Printer symlinks
+# EPSON LQ-590 (diplodocus) - matricial
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0005", SYMLINK+="printer/diplodocus", MODE="0666", GROUP="lp"
+UDEVRULES
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+echo -e "${GREEN}✅ Reglas udev configuradas${NC}"
+
+# Create symlink immediately if device is connected
+if [ -e /dev/usb/lp0 ]; then
+    VENDOR=$(cat /sys/class/usbmisc/lp0/device/uevent 2>/dev/null | grep PRODUCT | cut -d= -f2 | cut -d/ -f1)
+    if [ "$VENDOR" = "4b8" ]; then
+        sudo mkdir -p /dev/printer
+        sudo ln -sf /dev/usb/lp0 /dev/printer/diplodocus
+        sudo chmod 666 /dev/printer/diplodocus
+        echo -e "${GREEN}✅ Symlink /dev/printer/diplodocus creado${NC}"
+    fi
+fi
+
+# ============================================================
 # BACKUP (if updating)
 # ============================================================
 BACKUP_DIR=""

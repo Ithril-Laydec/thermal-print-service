@@ -99,8 +99,29 @@ async function printToDiplodocus(buffer) {
   if (platform === 'win32') {
     return printWindowsToPrinter(buffer, WINDOWS_PRINTER_DIPLODOCUS)
   } else {
-    throw new Error('Diplodocus solo disponible en Windows')
+    return printLinuxToDiplodocus(buffer)
   }
+}
+
+/**
+ * Impresión a diplodocus en Linux usando symlink udev
+ */
+async function printLinuxToDiplodocus(buffer) {
+  const device = '/dev/printer/diplodocus'
+
+  if (!fs.existsSync(device)) {
+    throw new Error('Diplodocus no conectada. Verifica conexión USB y ejecuta: sudo udevadm trigger')
+  }
+
+  try {
+    fs.accessSync(device, fs.constants.W_OK)
+  } catch (err) {
+    throw new Error(`Sin permisos en ${device}. Ejecuta: sudo chmod 666 ${device}`)
+  }
+
+  fs.writeFileSync(device, buffer)
+  console.log(`✅ Impresión en ${device}`)
+  return device
 }
 
 /**

@@ -15,8 +15,23 @@ Servicio minimalista para impresión térmica ESC/POS con soporte HTTPS.
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
 | POST   | `/print-thermal` | Imprime buffer binario ESC/POS (térmica) |
-| POST   | `/print-pickup` | Imprime en diplodocus (matricial EPSON LQ-590) |
+| POST   | `/print-pickup` | Imprime buffer binario ESC/P2 en diplodocus (matricial) |
 | GET    | `/health` | Health check del servicio |
+| GET    | `/version` | Versión del servicio y protocolo |
+
+### Impresoras soportadas
+
+| Impresora | Endpoint | Protocolo | Ubicación |
+|-----------|----------|-----------|-----------|
+| albaran (térmica) | `/print-thermal` | ESC/POS | USB local |
+| diplodocus (EPSON LQ-590) | `/print-pickup` | ESC/P2 | Windows de Jesús |
+
+### Diferencia ESC/POS vs ESC/P2
+
+- **ESC/POS**: Protocolo para impresoras térmicas de tickets (comandos como `1B 40` reset, `1D 56` corte)
+- **ESC/P2**: Protocolo para impresoras matriciales EPSON (comandos similares pero incompatibles)
+
+El frontend genera el buffer con el protocolo correcto según el endpoint.
 
 ## Instalación
 
@@ -146,15 +161,31 @@ thermal-print-service/
 
 ## Arquitectura
 
+### Linux
 ```
 Frontend (Vue HTTPS)
     ↓
-    https://localhost:20936/print
+    POST /print-thermal (buffer ESC/POS)
     ↓
 Thermal Print Service (Express + HTTPS)
     ↓
 /dev/usb/lp0 (Impresora Térmica)
 ```
+
+### Windows
+```
+Frontend (Vue HTTPS)
+    ↓
+    POST /print-thermal o /print-pickup (buffer binario)
+    ↓
+Thermal Print Service (Express + HTTPS)
+    ↓
+    RawPrint.exe "nombre_impresora" buffer.bin
+    ↓
+Impresora Windows (albaran, diplodocus, etc.)
+```
+
+**Por qué RawPrint.exe:** Windows no permite escribir directamente a dispositivos USB. RawPrint.exe usa la API nativa `winspool.drv` para enviar datos RAW a cualquier impresora compartida.
 
 ## Solución de Problemas
 

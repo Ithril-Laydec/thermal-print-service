@@ -3,8 +3,9 @@ const { execSync } = require('child_process')
 const path = require('path')
 const os = require('os')
 
-// Nombre de la impresora en Windows
+// Nombres de impresoras en Windows
 const WINDOWS_PRINTER_NAME = 'albaran'
+const WINDOWS_PRINTER_DIPLODOCUS = 'diplodocus'
 
 /**
  * Impresión directa con buffer binario ESC/POS
@@ -88,6 +89,53 @@ async function printLinux(buffer) {
   throw new Error(lastError || 'No se pudo imprimir. Ejecuta: sudo chmod 666 /dev/usb/lp0')
 }
 
+/**
+ * Impresión a diplodocus (EPSON LQ-590 matricial)
+ * Acepta buffer binario ESC/P2 o texto plano
+ */
+async function printToDiplodocus(buffer) {
+  const platform = process.platform
+
+  if (platform === 'win32') {
+    return printWindowsToPrinter(buffer, WINDOWS_PRINTER_DIPLODOCUS)
+  } else {
+    throw new Error('Diplodocus solo disponible en Windows')
+  }
+}
+
+/**
+ * Impresión genérica en Windows a cualquier impresora
+ */
+async function printWindowsToPrinter(buffer, printerName) {
+  const tempFile = path.join(os.tmpdir(), `print-${Date.now()}.bin`)
+  const rawPrintExe = path.join(__dirname, '..', '..', 'RawPrint.exe')
+
+  try {
+    fs.writeFileSync(tempFile, buffer)
+    console.log(`Archivo temporal: ${tempFile} (${buffer.length} bytes)`)
+
+    const result = execSync(`"${rawPrintExe}" "${printerName}" "${tempFile}"`, {
+      encoding: 'utf8',
+      timeout: 30000,
+      windowsHide: true
+    })
+
+    console.log(`Impresion en ${printerName}: ${result.trim()}`)
+    return printerName
+
+  } catch (error) {
+    console.error('Error Windows:', error.message)
+    throw new Error(`Error imprimiendo en ${printerName}: ${error.message}`)
+  } finally {
+    try {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile)
+      }
+    } catch (e) {}
+  }
+}
+
 module.exports = {
-  printWithRawBuffer
+  printWithRawBuffer,
+  printToDiplodocus
 }

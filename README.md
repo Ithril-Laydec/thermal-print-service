@@ -14,7 +14,8 @@ Servicio minimalista para impresión térmica ESC/POS con soporte HTTPS.
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| POST   | `/print` | Imprime buffer binario ESC/POS |
+| POST   | `/print-thermal` | Imprime buffer binario ESC/POS (térmica) |
+| POST   | `/print-pickup` | Imprime en diplodocus (matricial EPSON LQ-590) |
 | GET    | `/health` | Health check del servicio |
 
 ## Instalación
@@ -186,6 +187,14 @@ sudo usermod -a -G lp $USER
 
 # Configurar permisos del dispositivo
 sudo chmod 666 /dev/usb/lp0
+```
+
+## Conexiones Remotas (SSH)
+
+### Oficina - Windows de Jesús
+
+```bash
+ssh Usuario@192.168.0.17
 ```
 
 ## Licencia

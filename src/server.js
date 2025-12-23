@@ -4,14 +4,15 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const cors = require('cors')
-const { printRaw } = require('./controllers/printController')
+const { printRaw, printPickup } = require('./controllers/printController')
 const { PORT, HOST } = require('./config/config')
 
 const app = express()
 
 // Middleware
 app.use(cors())
-app.post('/print', express.raw({ type: '*/*', limit: '10mb' }), printRaw)
+app.post('/print-thermal', express.raw({ type: '*/*', limit: '10mb' }), printRaw)
+app.post('/print-pickup', express.raw({ type: '*/*', limit: '10mb' }), printPickup)
 app.use(express.json())
 
 // Health check
@@ -63,9 +64,10 @@ if (credentials) {
   httpsServer.listen(PORT, HOST, () => {
     console.log('🖨️  Servicio de impresión térmica')
     console.log(`🔒 https://${HOST}:${PORT}`)
-    console.log('POST /print   - Imprime buffer ESC/POS')
-    console.log('GET  /health  - Health check')
-    console.log('GET  /version - Versión del servicio')
+    console.log('POST /print-thermal - Imprime buffer ESC/POS (térmica)')
+    console.log('POST /print-pickup  - Imprime en diplodocus (matricial)')
+    console.log('GET  /health        - Health check')
+    console.log('GET  /version       - Versión del servicio')
     console.log('✅ Certificados SSL cargados correctamente')
   })
 } else {
@@ -74,9 +76,10 @@ if (credentials) {
   httpServer.listen(PORT, HOST, () => {
     console.log('🖨️  Servicio de impresión térmica')
     console.log(`📡 http://${HOST}:${PORT}`)
-    console.log('POST /print   - Imprime buffer ESC/POS')
-    console.log('GET  /health  - Health check')
-    console.log('GET  /version - Versión del servicio')
+    console.log('POST /print-thermal - Imprime buffer ESC/POS (térmica)')
+    console.log('POST /print-pickup  - Imprime en diplodocus (matricial)')
+    console.log('GET  /health        - Health check')
+    console.log('GET  /version       - Versión del servicio')
     console.log('⚠️  Sin certificados SSL - ejecutando en HTTP')
     console.log('💡 Para HTTPS, genera certificados con: mkcert localhost 127.0.0.1 ::1')
   })

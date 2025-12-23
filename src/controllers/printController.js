@@ -1,4 +1,4 @@
-const { printWithRawBuffer } = require('../services/RawEscposService')
+const { printWithRawBuffer, printToDiplodocus } = require('../services/RawEscposService')
 
 /**
  * Endpoint de impresión - Recibe buffer binario ESC/POS directamente
@@ -40,6 +40,39 @@ async function printRaw(req, res) {
   }
 }
 
+/**
+ * Endpoint de impresión para diplodocus (matricial EPSON LQ-590)
+ */
+async function printPickup(req, res) {
+  console.log('📥 POST /print-pickup recibido')
+
+  try {
+    const buffer = Buffer.from(req.body)
+    console.log('📊 Buffer length:', buffer.length)
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'Buffer vacío' })
+    }
+
+    const device = await printToDiplodocus(buffer)
+    console.log('✅ Impresión exitosa en:', device)
+
+    res.json({
+      success: true,
+      device: device,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error.message)
+    res.status(500).json({
+      error: 'Error al imprimir',
+      details: error.message
+    })
+  }
+}
+
 module.exports = {
-  printRaw
+  printRaw,
+  printPickup
 }

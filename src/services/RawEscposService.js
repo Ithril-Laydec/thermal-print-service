@@ -156,7 +156,53 @@ async function printWindowsToPrinter(buffer, printerName) {
   }
 }
 
+/**
+ * Impresión a SATO WS412 (etiquetas SBPL)
+ * Usa CUPS en Linux, RawPrint en Windows
+ */
+async function printToSato(buffer) {
+  const platform = process.platform
+
+  if (platform === 'win32') {
+    return printWindowsToPrinter(buffer, 'Albaranes')
+  } else {
+    return printLinuxToSato(buffer)
+  }
+}
+
+/**
+ * Impresión a SATO en Linux usando CUPS
+ */
+async function printLinuxToSato(buffer) {
+  const tempFile = path.join(os.tmpdir(), `sato-${Date.now()}.bin`)
+  const cupsQueue = 'Albaranes'
+
+  try {
+    fs.writeFileSync(tempFile, buffer)
+    console.log(`Archivo temporal SATO: ${tempFile} (${buffer.length} bytes)`)
+
+    execSync(`lp -d ${cupsQueue} -o raw "${tempFile}"`, {
+      encoding: 'utf8',
+      timeout: 30000
+    })
+
+    console.log(`✅ Impresión SATO en cola ${cupsQueue}`)
+    return cupsQueue
+
+  } catch (error) {
+    console.error('Error SATO:', error.message)
+    throw new Error(`Error imprimiendo en SATO: ${error.message}`)
+  } finally {
+    try {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile)
+      }
+    } catch (e) {}
+  }
+}
+
 module.exports = {
   printWithRawBuffer,
-  printToDiplodocus
+  printToDiplodocus,
+  printToSato
 }

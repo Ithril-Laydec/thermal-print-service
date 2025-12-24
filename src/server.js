@@ -4,7 +4,7 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const cors = require('cors')
-const { printRaw, printPickup } = require('./controllers/printController')
+const { printRaw, printPickup, printLabels } = require('./controllers/printController')
 const { PORT, HOST } = require('./config/config')
 
 const app = express()
@@ -15,6 +15,7 @@ app.options('*', cors()) // Habilitar preflight para todas las rutas
 app.use(express.json())
 app.post('/print-thermal', express.raw({ type: '*/*', limit: '10mb' }), printRaw)
 app.post('/print-pickup', express.raw({ type: '*/*', limit: '10mb' }), printPickup)
+app.post('/print-labels', express.raw({ type: '*/*', limit: '10mb' }), printLabels)
 
 // Health check
 app.get('/health', (req, res) => {
@@ -67,6 +68,7 @@ if (credentials) {
     console.log(`🔒 https://${HOST}:${PORT}`)
     console.log('POST /print-thermal - Imprime buffer ESC/POS (térmica)')
     console.log('POST /print-pickup  - Imprime en diplodocus (matricial)')
+    console.log('POST /print-labels  - Imprime etiquetas SBPL (SATO)')
     console.log('GET  /health        - Health check')
     console.log('GET  /version       - Versión del servicio')
     console.log('✅ Certificados SSL cargados correctamente')
@@ -79,6 +81,7 @@ if (credentials) {
     console.log(`📡 http://${HOST}:${PORT}`)
     console.log('POST /print-thermal - Imprime buffer ESC/POS (térmica)')
     console.log('POST /print-pickup  - Imprime en diplodocus (matricial)')
+    console.log('POST /print-labels  - Imprime etiquetas SBPL (SATO)')
     console.log('GET  /health        - Health check')
     console.log('GET  /version       - Versión del servicio')
     console.log('⚠️  Sin certificados SSL - ejecutando en HTTP')

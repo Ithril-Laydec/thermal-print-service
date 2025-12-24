@@ -1,4 +1,4 @@
-const { printWithRawBuffer, printToDiplodocus } = require('../services/RawEscposService')
+const { printWithRawBuffer, printToDiplodocus, printToSato } = require('../services/RawEscposService')
 
 /**
  * Endpoint de impresión - Recibe buffer binario ESC/POS directamente
@@ -72,7 +72,40 @@ async function printPickup(req, res) {
   }
 }
 
+/**
+ * Endpoint de impresión de etiquetas SBPL para SATO WS412
+ */
+async function printLabels(req, res) {
+  console.log('📥 POST /print-labels recibido')
+
+  try {
+    const buffer = Buffer.from(req.body)
+    console.log('📊 Buffer length:', buffer.length)
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'Buffer vacío' })
+    }
+
+    const device = await printToSato(buffer)
+    console.log('✅ Etiquetas impresas en:', device)
+
+    res.json({
+      success: true,
+      device: device,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error.message)
+    res.status(500).json({
+      error: 'Error al imprimir etiquetas',
+      details: error.message
+    })
+  }
+}
+
 module.exports = {
   printRaw,
-  printPickup
+  printPickup,
+  printLabels
 }

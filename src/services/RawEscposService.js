@@ -6,6 +6,7 @@ const os = require('os')
 // Nombres de impresoras en Windows
 const WINDOWS_PRINTER_NAME = 'albaran'
 const WINDOWS_PRINTER_DIPLODOCUS = 'diplodocus'
+const WINDOWS_SATO_NAMES = ['SATO WS412', 'ETIQUETADORA', 'Etiquetas']
 
 /**
  * Impresión directa con buffer binario ESC/POS
@@ -157,6 +158,24 @@ async function printWindowsToPrinter(buffer, printerName) {
 }
 
 /**
+ * Busca la primera impresora disponible entre los nombres dados (Windows)
+ */
+function findWindowsPrinter(names) {
+  try {
+    const result = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
+      encoding: 'utf8',
+      timeout: 5000,
+      windowsHide: true
+    })
+    const installed = result.split('\n').map(p => p.trim())
+    return names.find(name => installed.includes(name))
+  } catch (error) {
+    console.error('Error buscando impresoras:', error.message)
+    return null
+  }
+}
+
+/**
  * Impresión a SATO WS412 (etiquetas SBPL)
  * Usa CUPS en Linux, RawPrint en Windows
  */
@@ -164,7 +183,12 @@ async function printToSato(buffer) {
   const platform = process.platform
 
   if (platform === 'win32') {
-    return printWindowsToPrinter(buffer, 'Albaranes')
+    const printerName = findWindowsPrinter(WINDOWS_SATO_NAMES)
+    if (!printerName) {
+      throw new Error(`No se encontró impresora SATO. Nombres buscados: ${WINDOWS_SATO_NAMES.join(', ')}`)
+    }
+    console.log(`Impresora SATO encontrada: ${printerName}`)
+    return printWindowsToPrinter(buffer, printerName)
   } else {
     return printLinuxToSato(buffer)
   }

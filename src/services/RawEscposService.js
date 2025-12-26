@@ -27,7 +27,7 @@ async function printWithRawBuffer(buffer) {
  */
 async function printWindows(buffer) {
   const tempFile = path.join(os.tmpdir(), `thermal-${Date.now()}.bin`)
-  const rawPrintExe = path.join(__dirname, '..', '..', 'RawPrint.exe')
+  const rawPrintExe = path.join(__dirname, '..', '..', 'installers', 'bin', 'RawPrint.exe')
 
   try {
     fs.writeFileSync(tempFile, buffer)
@@ -129,7 +129,7 @@ async function printLinuxToDiplodocus(buffer) {
  */
 async function printWindowsToPrinter(buffer, printerName) {
   const tempFile = path.join(os.tmpdir(), `print-${Date.now()}.bin`)
-  const rawPrintExe = path.join(__dirname, '..', '..', 'RawPrint.exe')
+  const rawPrintExe = path.join(__dirname, '..', '..', 'installers', 'bin', 'RawPrint.exe')
 
   try {
     fs.writeFileSync(tempFile, buffer)

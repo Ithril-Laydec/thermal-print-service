@@ -251,7 +251,7 @@ Remove-Item -Path "bun.lockb" -ErrorAction SilentlyContinue
 
 # Use cmd /c to completely bypass PowerShell stderr handling
 # PowerShell treats ANY stderr output as error which breaks bun's progress messages
-cmd /c "bun install --production"
+& $env:ComSpec /c "bun install --production"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Error instalando dependencias" -ForegroundColor Red
     if ($IsUpdate -and $BACKUP_DIR) {

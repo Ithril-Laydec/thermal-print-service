@@ -159,15 +159,17 @@ async function printWindowsToPrinter(buffer, printerName) {
 
 /**
  * Busca la primera impresora disponible entre los nombres dados (Windows)
+ * Usa wmic en lugar de PowerShell para evitar timeouts cuando corre como SYSTEM
  */
 function findWindowsPrinter(names) {
   try {
-    const result = execSync('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
+    const result = execSync('wmic printer get name', {
       encoding: 'utf8',
-      timeout: 30000,
+      timeout: 10000,
       windowsHide: true
     })
-    const installed = result.split('\n').map(p => p.trim())
+    // wmic output: primera línea es "Name", resto son nombres con espacios trailing
+    const installed = result.split('\n').slice(1).map(p => p.trim()).filter(Boolean)
     return names.find(name => installed.includes(name))
   } catch (error) {
     console.error('Error buscando impresoras:', error.message)

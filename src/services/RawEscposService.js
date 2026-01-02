@@ -157,11 +157,20 @@ async function printWindowsToPrinter(buffer, printerName) {
   }
 }
 
+// Caché de impresora SATO para evitar llamadas repetidas a wmic
+let cachedSatoPrinter = null
+
 /**
  * Busca la primera impresora disponible entre los nombres dados (Windows)
  * Usa wmic en lugar de PowerShell para evitar timeouts cuando corre como SYSTEM
+ * Cachea el resultado para evitar procesos zombie por timeouts
  */
 function findWindowsPrinter(names) {
+  // Retornar caché si existe
+  if (cachedSatoPrinter) {
+    return cachedSatoPrinter
+  }
+
   try {
     const result = execSync('wmic printer get name', {
       encoding: 'utf8',
@@ -170,7 +179,12 @@ function findWindowsPrinter(names) {
     })
     // wmic output: primera línea es "Name", resto son nombres con espacios trailing
     const installed = result.split('\n').slice(1).map(p => p.trim()).filter(Boolean)
-    return names.find(name => installed.includes(name))
+    const found = names.find(name => installed.includes(name))
+    if (found) {
+      cachedSatoPrinter = found
+      console.log(`Impresora SATO cacheada: ${found}`)
+    }
+    return found
   } catch (error) {
     console.error('Error buscando impresoras:', error.message)
     return null

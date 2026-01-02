@@ -234,13 +234,13 @@ Error buscando impresoras: spawnSync cmd.exe ETIMEDOUT
 irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.ps1 | iex
 ```
 
-### Windows: Primera petición falla, al recargar funciona
+### Windows: Primera petición falla, al recargar funciona (no confirmado)
 
 **Síntoma**: La primera impresión desde el navegador falla silenciosamente, pero al recargar la página funciona.
 
-**Causa probable**: El navegador bloquea la primera petición HTTPS al certificado auto-firmado hasta que el usuario lo acepta (implícita o explícitamente).
+**Causa probable (no confirmada)**: El navegador podría bloquear la primera petición HTTPS al certificado auto-firmado hasta que el usuario lo acepta.
 
-**Solución**: Asegurarse de que el CA local de mkcert está instalado en el sistema:
+**Posible solución**: Asegurarse de que el CA local de mkcert está instalado en el sistema:
 ```powershell
 mkcert -install
 ```

@@ -220,6 +220,32 @@ sudo usermod -a -G lp $USER
 sudo chmod 666 /dev/usb/lp0
 ```
 
+### Windows: "No se encontró impresora SATO" (ETIMEDOUT)
+
+**Síntoma**: El servicio no encuentra impresoras aunque están instaladas. Log muestra:
+```
+Error buscando impresoras: spawnSync cmd.exe ETIMEDOUT
+```
+
+**Causa**: El servicio corre como `LocalSystem`. PowerShell `Get-Printer` puede hacer timeout cuando se ejecuta desde este contexto.
+
+**Solución**: El código usa `wmic printer get name` en lugar de PowerShell. Si ves este error, actualiza el servicio:
+```powershell
+irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.ps1 | iex
+```
+
+### Windows: Primera petición falla, al recargar funciona
+
+**Síntoma**: La primera impresión desde el navegador falla silenciosamente, pero al recargar la página funciona.
+
+**Causa probable**: El navegador bloquea la primera petición HTTPS al certificado auto-firmado hasta que el usuario lo acepta (implícita o explícitamente).
+
+**Solución**: Asegurarse de que el CA local de mkcert está instalado en el sistema:
+```powershell
+mkcert -install
+```
+Y reiniciar el navegador completamente.
+
 ## Conexiones Remotas (SSH)
 
 ### Oficina - Windows de Jesús

@@ -227,9 +227,13 @@ sudo chmod 666 /dev/usb/lp0
 Error buscando impresoras: spawnSync cmd.exe ETIMEDOUT
 ```
 
-**Causa**: El servicio corre como `LocalSystem`. PowerShell `Get-Printer` puede hacer timeout cuando se ejecuta desde este contexto.
+**Causa**: El servicio corre como `LocalSystem`. Ejecutar comandos externos (PowerShell/wmic) desde este contexto puede hacer timeout. Además, si `execSync` hace timeout, el proceso hijo `cmd.exe` queda como zombie y bloquea futuros intentos.
 
-**Solución**: El código usa `wmic printer get name` en lugar de PowerShell. Si ves este error, actualiza el servicio:
+**Solución implementada**:
+1. Usa `wmic printer get name` en lugar de PowerShell (más rápido)
+2. Cachea el nombre de la impresora tras el primer éxito (evita llamadas repetidas a wmic)
+
+Si ves este error, actualiza el servicio:
 ```powershell
 irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.ps1 | iex
 ```

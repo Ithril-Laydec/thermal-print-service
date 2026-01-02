@@ -162,9 +162,9 @@ async function printWindowsToPrinter(buffer, printerName) {
  */
 function findWindowsPrinter(names) {
   try {
-    const result = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
+    const result = execSync('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
       encoding: 'utf8',
-      timeout: 5000,
+      timeout: 30000,
       windowsHide: true
     })
     const installed = result.split('\n').map(p => p.trim())

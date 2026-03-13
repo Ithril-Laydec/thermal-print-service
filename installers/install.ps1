@@ -263,6 +263,58 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ============================================================
+# SYSTEM OPTIMIZATIONS (prevent cold-start issues)
+# ============================================================
+Write-Host ""
+Write-Host "⚡ Configurando optimizaciones del sistema..." -ForegroundColor Yellow
+
+# 1. Disable USB Selective Suspend (prevents USB printers from sleeping)
+try {
+    # Active power scheme
+    $activeScheme = (powercfg /getactivescheme) -replace '.*:\s*(\S+)\s.*', '$1'
+    # USB selective suspend: SubGroup 2a737441... Setting 48e6b7a6...
+    # Value 0 = Disabled, 1 = Enabled
+    powercfg /setacvalueindex $activeScheme 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+    powercfg /setdcvalueindex $activeScheme 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+    powercfg /setactive $activeScheme
+    Write-Host "   ✅ USB Selective Suspend desactivado" -ForegroundColor Green
+} catch {
+    Write-Host "   ⚠️  No se pudo desactivar USB Selective Suspend" -ForegroundColor Yellow
+}
+
+# 2. Ensure Print Spooler is set to Automatic (not Delayed or Manual)
+try {
+    $spooler = Get-Service -Name Spooler -ErrorAction Stop
+    if ($spooler.StartType -ne 'Automatic') {
+        Set-Service -Name Spooler -StartupType Automatic
+        Write-Host "   ✅ Print Spooler configurado como Automático" -ForegroundColor Green
+    } else {
+        Write-Host "   ✅ Print Spooler ya es Automático" -ForegroundColor Green
+    }
+    if ($spooler.Status -ne 'Running') {
+        Start-Service -Name Spooler
+        Write-Host "   ✅ Print Spooler iniciado" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "   ⚠️  No se pudo configurar Print Spooler: $_" -ForegroundColor Yellow
+}
+
+# 3. Disable Windows memory compression for service processes (prevents page-out)
+try {
+    # Set ThermalPrintService to not be trimmed from working set
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
+    $currentValue = Get-ItemProperty -Path $regPath -Name "DisablePagingExecutive" -ErrorAction SilentlyContinue
+    if (-not $currentValue -or $currentValue.DisablePagingExecutive -ne 1) {
+        Set-ItemProperty -Path $regPath -Name "DisablePagingExecutive" -Value 1 -Type DWord
+        Write-Host "   ✅ Paginación de ejecutables del kernel desactivada" -ForegroundColor Green
+    } else {
+        Write-Host "   ✅ Paginación de ejecutables ya desactivada" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "   ⚠️  No se pudo configurar paginación: $_" -ForegroundColor Yellow
+}
+
+# ============================================================
 # GENERATE SSL CERTIFICATES
 # ============================================================
 Write-Host ""

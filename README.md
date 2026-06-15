@@ -38,13 +38,79 @@ El frontend genera el buffer con el protocolo correcto según el endpoint.
 
 ## Instalación
 
-⭐ **UN SOLO COMANDO que lo instala TODO** (incluyendo Bun, mkcert, certificados SSL y el servicio):
+⭐ **UN SOLO COMANDO que lo instala TODO** (incluyendo Bun, certificados SSL y el servicio):
 
-### Linux (Ubuntu/Debian)
+### Linux (Ubuntu/Debian) — tres modos
+
+#### Modo cliente (por defecto)
+
+Instala el servicio escuchando en `localhost` con certificado mkcert.
+Ideal para PCs con impresora térmica USB local.
 
 ```bash
 curl -fsSL https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.sh | bash
 ```
+
+✨ Qué hace:
+- ✅ Instala Bun y mkcert
+- ✅ Configura CA local y genera certificados SSL para localhost
+- ✅ Descarga e instala el servicio (HOST=localhost)
+- ✅ Lo configura como servicio systemd y lo inicia
+
+#### Modo servidor (`--server`)
+
+Instala el servicio escuchando en todas las interfaces (`0.0.0.0`).
+Ideal para un servidor Linux con impresoras físicas accesible desde la LAN.
+
+```bash
+curl -fsSL https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers/install.sh | bash -s -- --server
+```
+
+Si ya tienes un certificado emitido para el dominio (ver modo siguiente), pásalo con `--domain`:
+
+```bash
+curl -fsSL .../install.sh | bash -s -- --server --domain print.tu-dominio.com
+```
+
+✨ Qué hace adicionalmente:
+- ✅ HOST=0.0.0.0 en el unit systemd
+- ✅ Enmascara CUPS (`cups`, `cups-browsed`, `cups.socket`, `cups.path`) — CUPS reclama la
+  impresora matricial EPSON por libusb y desvincula `usblp` haciendo desaparecer
+  `/dev/usb/lp0`. Con CUPS enmascarado y `usblp` activo, `/dev/printer/diplodocus` queda estable
+- ✅ Asegura el módulo `usblp` (cargado y persistente en `/etc/modules-load.d/`)
+- ✅ Instala `curl` si no está presente
+- ✅ Configura UFW: detecta el puerto real de sshd (no asume 22) y lo permite antes de habilitar
+  el firewall, evitando cortes en puertos no estándar; luego abre el 20936 desde la subred LAN
+- ✅ Crea `/etc/sudoers.d/thermal-print-reload` con permiso NOPASSWD acotado a
+  `systemctl restart thermal-print` para el usuario del servicio, validado con `visudo -cf`
+- ✅ Si se pasa `--domain`, exporta `CERT_FILE`/`KEY_FILE` en el unit apuntando a
+  `/opt/thermal-print-service/certs/<fqdn>.{pem,key}`
+
+#### Modo servidor + emitir certificado (`--server --issue-cert`)
+
+Emite un certificado Let's Encrypt vía DNS-01 con deSEC y lo configura automáticamente.
+
+```bash
+curl -fsSL .../install.sh | bash -s -- \
+  --server \
+  --issue-cert \
+  --domain print.tu-dominio.com \
+  --dedyn-token TU_TOKEN_DESEC
+```
+
+✨ Qué hace adicionalmente:
+- ✅ Valida el token deSEC **antes** de tocar nada (distingue error de red de token inválido)
+- ✅ Instala `acme.sh` si no está presente y emite el certificado (`--keylength ec-256`) **antes**
+  de parar el servicio ni hacer backup — si `--issue` falla (propagación DNS, red), el script
+  aborta limpiamente sin haber detenido el servicio en ningún momento
+- ✅ Instala el certificado en `/opt/thermal-print-service/certs/<fqdn>.{pem,key}` una vez que
+  los archivos del proyecto están en su lugar
+- ✅ Configura renovación automática con `--reloadcmd "sudo systemctl restart thermal-print"`
+  (funciona sin contraseña gracias a la regla sudoers creada en modo servidor)
+- ✅ El unit systemd exporta `CERT_FILE`/`KEY_FILE` apuntando a esas rutas
+
+> **Nota**: `DEDYN_TOKEN` es la variable que usa el plugin `dns_desec` de acme.sh.
+> Obtén tu token en https://desec.io → Cuenta → Token API.
 
 ### Windows (PowerShell como Administrador)
 
@@ -60,10 +126,10 @@ irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers
 - ✅ Genera certificados SSL para localhost
 - ✅ Descarga e instala el servicio
 - ✅ Lo configura como servicio del sistema
-- ✅ **[Windows]** Optimiza el sistema para impresión confiable (desactiva USB suspend, configura print spooler, reduce paginación)
+- ✅ Optimiza el sistema para impresión confiable (desactiva USB suspend, configura print spooler, reduce paginación)
 - ✅ Lo inicia automáticamente
 
-🔄 **Actualización**: El mismo comando detecta si ya está instalado y lo actualiza, regenerando los certificados si es necesario.
+🔄 **Actualización**: El mismo comando detecta si ya está instalado y lo actualiza (idempotente).
 
 ## Desarrollo Local con HTTPS
 

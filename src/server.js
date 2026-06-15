@@ -85,19 +85,39 @@ app.get('/version', (req, res) => {
 	})
 })
 
-// Función para buscar certificados mkcert
+// Función para buscar certificados.
+//
+// Prioridad 1 — variables de entorno CERT_FILE / KEY_FILE:
+//   Usadas por el modo servidor (--server --domain <fqdn>) para apuntar
+//   a los certificados Let's Encrypt instalados por acme.sh en
+//   /opt/thermal-print-service/certs/<fqdn>.{pem,key}.
+//   El unit systemd las exporta cuando se instala con --domain.
+//
+// Prioridad 2 — certificados mkcert localhost (modo cliente / desarrollo):
+//   Busca localhost+2.pem / localhost+2-key.pem en el directorio raíz del
+//   proyecto, exactamente como antes. Este comportamiento NO cambia.
+//
+// Si ninguno existe, el servidor arranca en HTTP (fallback ya existente).
 function findCertificates() {
-	const certPaths = [
-		// Ruta relativa al proyecto
-		path.join(__dirname, '..', 'localhost+2.pem'),
-		path.join(__dirname, '..', 'localhost+2-key.pem'),
-		// Otras posibles ubicaciones
-		path.join(__dirname, '..', 'certs', 'localhost+2.pem'),
-		path.join(__dirname, '..', 'certs', 'localhost+2-key.pem'),
-	]
+	// Priority 1: explicit cert paths via env vars (server mode / Let's Encrypt)
+	const envCert = process.env.CERT_FILE
+	const envKey = process.env.KEY_FILE
+	if (envCert && envKey) {
+		if (fs.existsSync(envCert) && fs.existsSync(envKey)) {
+			return {
+				cert: fs.readFileSync(envCert),
+				key: fs.readFileSync(envKey),
+			}
+		}
+		// Vars set but files missing: warn and fall through to mkcert lookup
+		console.warn(
+			`⚠️  CERT_FILE/KEY_FILE definidos pero no encontrados: ${envCert}, ${envKey}`,
+		)
+	}
 
-	const cert = certPaths[0]
-	const key = certPaths[1]
+	// Priority 2: mkcert localhost certs (client mode / local dev)
+	const cert = path.join(__dirname, '..', 'localhost+2.pem')
+	const key = path.join(__dirname, '..', 'localhost+2-key.pem')
 
 	if (fs.existsSync(cert) && fs.existsSync(key)) {
 		return {

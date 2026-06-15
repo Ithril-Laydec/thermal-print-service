@@ -136,6 +136,7 @@ if [ "$ISSUE_CERT" = true ]; then
 
   echo "📜 Emitiendo certificado Let's Encrypt para $DOMAIN (DNS-01 / deSEC)..."
   echo "   ⏳ Esperando propagación DNS (~120 segundos)..."
+  set +e
   DEDYN_TOKEN="$DEDYN_TOKEN" "$ACME_BIN" \
     --issue \
     --dns dns_desec \
@@ -143,7 +144,16 @@ if [ "$ISSUE_CERT" = true ]; then
     --server letsencrypt \
     --keylength ec-256 \
     --dnssleep 120
-  echo -e "${GREEN}✅ Certificado emitido${NC}"
+  ACME_ISSUE_RC=$?
+  set -e
+  if [ $ACME_ISSUE_RC -eq 0 ]; then
+    echo -e "${GREEN}✅ Certificado emitido${NC}"
+  elif [ $ACME_ISSUE_RC -eq 2 ]; then
+    echo -e "${GREEN}✅ Certificado ya vigente, no es necesario renovar${NC}"
+  else
+    echo -e "${RED}❌ Error al emitir el certificado (acme.sh salió con código $ACME_ISSUE_RC)${NC}"
+    exit 1
+  fi
   echo ""
 fi
 

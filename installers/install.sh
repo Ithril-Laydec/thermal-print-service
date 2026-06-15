@@ -355,6 +355,8 @@ sudo tee $UDEV_RULES_FILE > /dev/null <<'UDEVRULES'
 # Thermal Print Service - Printer symlinks
 # EPSON LQ-590 (diplodocus) - matricial
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0005", SYMLINK+="printer/diplodocus", MODE="0666", GROUP="lp"
+# STMicro térmica (tickets/albaranes) - 0483:5743
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5743", SYMLINK+="printer/thermal", MODE="0666", GROUP="lp"
 UDEVRULES
 
 sudo udevadm control --reload-rules

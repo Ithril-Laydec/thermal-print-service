@@ -99,15 +99,57 @@ async function printWindows(buffer) {
 
 /**
  * Impresión en Linux usando dispositivos /dev/usb/lp*
+ * Resolución del dispositivo térmico (por prioridad):
+ *   (a) /dev/printer/thermal  — symlink udev por VID:PID (STMicro 0483:5743)
+ *   (b) primer /dev/usb/lp* que NO sea el dispositivo real de diplodocus
+ *   (c) fallback: primer /dev/usb/lp* disponible (comportamiento original)
  */
 async function printLinux(buffer) {
-	const devices = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/lp0']
+	const THERMAL_SYMLINK = '/dev/printer/thermal'
+	const DIPLODOCUS_SYMLINK = '/dev/printer/diplodocus'
+	const LP_DEVICES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/lp0']
+
+	let candidates = []
+
+	if (fs.existsSync(THERMAL_SYMLINK)) {
+		// (a) symlink udev térmico — identificación exacta por VID:PID
+		candidates = [THERMAL_SYMLINK]
+	} else {
+		// Resolver el dispositivo real de diplodocus para excluirlo
+		let diplodocusReal = null
+		if (fs.existsSync(DIPLODOCUS_SYMLINK)) {
+			try {
+				diplodocusReal = fs.realpathSync(DIPLODOCUS_SYMLINK)
+			} catch (e) {
+				// No se pudo resolver; no excluimos nada
+			}
+		}
+
+		// (b) primer lp* que no sea la matricial
+		const available = LP_DEVICES.filter((dev) => {
+			if (!fs.existsSync(dev)) return false
+			if (diplodocusReal !== null) {
+				try {
+					return fs.realpathSync(dev) !== diplodocusReal
+				} catch (e) {
+					return true
+				}
+			}
+			return true
+		})
+
+		if (available.length > 0) {
+			candidates = available
+		} else {
+			// (c) fallback: comportamiento original (ningún lp* descartable encontrado)
+			candidates = LP_DEVICES.filter((dev) => fs.existsSync(dev))
+		}
+	}
+
 	let lastError = null
 
-	for (const device of devices) {
+	for (const device of candidates) {
 		try {
-			if (!fs.existsSync(device)) continue
-
 			// Verificar permisos
 			try {
 				fs.accessSync(device, fs.constants.W_OK)

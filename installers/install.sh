@@ -587,9 +587,10 @@ if [ "$MODE" = "server" ]; then
 
     # CRITICAL: allow SSH first, before enabling ufw
     # Detect actual sshd port — non-standard ports would be cut off by "ufw allow OpenSSH" (22)
-    SSH_PORT=$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}')
+    SSH_PORT=$(sudo sshd -T 2>/dev/null | awk '/^port /{print $2; exit}')
     if [ -z "$SSH_PORT" ]; then
-      SSH_PORT=$(ss -tlnp 2>/dev/null | awk '/sshd/{match($4, /:([0-9]+)$/, a); if(a[1]) {print a[1]; exit}}')
+      # Portable fallback: grep sshd from ss output, extract trailing port with grep -oE (no gawk extensions)
+      SSH_PORT=$(ss -H -tlnp 2>/dev/null | grep 'sshd' | awk '{print $4}' | grep -oE '[0-9]+$' | head -1)
     fi
     SSH_PORT="${SSH_PORT:-22}"
     sudo ufw allow "$SSH_PORT/tcp"

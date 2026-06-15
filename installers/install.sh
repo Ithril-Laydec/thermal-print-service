@@ -264,16 +264,177 @@ else
 fi
 
 # ============================================================
-# CUPS: mask in server mode, skip in client mode
-# (client local no necesita CUPS; matricial/térmica van por usblp directo)
+# setup_cups_hp: reactivate cups.service+cups.socket and configure the
+# HP LaserJet 1320 as a shared LAN printer.
+#
+# cups-browsed and cups.path are masked earlier in this script and must
+# remain masked; only cups.service+cups.socket are brought back up.
+#
+# Idempotent: lpadmin -p creates or updates the queue; grep guards prevent
+# duplicate Listen/Allow lines; ufw silently ignores duplicate rules.
+# Called from server mode only, after the masking block below.
+# ============================================================
+setup_cups_hp() {
+  local CUPS_LAN="192.168.0.0/24"
+  local CUPS_PORT="631"
+  local CUPSD_CONF="/etc/cups/cupsd.conf"
+
+  echo ""
+  echo "🖨️  Configurando CUPS + HP LaserJet 1320..."
+
+  # --- 1. Unmask and enable cups.service + cups.socket ---
+  # cups-browsed and cups.path stay masked (masked earlier in this script).
+  echo "🔧 Activando cups.service y cups.socket..."
+  sudo systemctl unmask cups.service cups.socket 2>/dev/null || true
+  sudo systemctl enable --now cups.socket cups.service 2>/dev/null || true
+  echo -e "${GREEN}✅ cups.service y cups.socket activos${NC}"
+
+  # --- 2. Remove dangerous usb:// queues (libusb backend detaches usblp) ---
+  # Any queue whose device URI starts with usb:// uses the CUPS libusb backend,
+  # which calls libusb_detach_kernel_interface() and rips usblp away from the
+  # matricial printer.  NEVER remove queues with hp:// URI (hplip uses usblp).
+  echo "🔧 Eliminando colas con backend usb:// (libusb)..."
+  set +e
+  DANGEROUS_QUEUES=$(lpstat -v 2>/dev/null | awk '$NF ~ /^usb:\/\//{gsub(/:$/,"", $3); print $3}')
+  set -e
+  if [ -n "$DANGEROUS_QUEUES" ]; then
+    for q in $DANGEROUS_QUEUES; do
+      echo "   🗑️  Eliminando cola: $q (device usb://)"
+      sudo lpadmin -x "$q" 2>/dev/null || true
+    done
+    echo -e "${GREEN}✅ Colas usb:// eliminadas${NC}"
+  else
+    echo -e "${GREEN}✅ No hay colas usb:// peligrosas${NC}"
+  fi
+
+  # --- 3. Detect HP URI and PPD dynamically (no hardcoded serial) ---
+  # Expected URI format: hp:/usb/hp_LaserJet_1320_series?serial=XXXXXXXX
+  # Expected PPD:        drv:///hpcups.drv/hp-laserjet_1320_series-pcl3.ppd
+  echo "🔍 Detectando HP LaserJet 1320..."
+  set +e
+  HP_URI=$(lpinfo -v 2>/dev/null | grep -i 'hp:' | awk '{print $2}' | head -1)
+  set -e
+
+  if [ -z "$HP_URI" ]; then
+    echo -e "${YELLOW}⚠️  HP LaserJet 1320 no detectada (no conectada).${NC}"
+    echo -e "${YELLOW}   Cola HP omitida. Re-ejecuta el instalador con la HP conectada para completarla.${NC}"
+  else
+    echo "   📍 URI detectada: $HP_URI"
+
+    # Prefer hpcups PPD; fall back to any 1320 PPD available
+    set +e
+    HP_PPD=$(lpinfo -m 2>/dev/null | grep -i '1320' | grep -i 'hpcups' | awk '{print $1}' | head -1)
+    set -e
+    if [ -z "$HP_PPD" ]; then
+      set +e
+      HP_PPD=$(lpinfo -m 2>/dev/null | grep -i '1320' | awk '{print $1}' | head -1)
+      set -e
+    fi
+
+    if [ -z "$HP_PPD" ]; then
+      echo -e "${YELLOW}⚠️  No se encontró PPD para HP LaserJet 1320. Cola HP no configurada.${NC}"
+    else
+      echo "   📄 PPD detectado: $HP_PPD"
+
+      # --- 4. Create/update HP queue (lpadmin -p creates or modifies: idempotent) ---
+      echo "🖨️  Creando/actualizando cola HP_LaserJet_1320..."
+      sudo lpadmin -p HP_LaserJet_1320 -E -v "$HP_URI" -m "$HP_PPD" \
+        -o printer-is-shared=true -D "HP LaserJet 1320" -L "Servidor central"
+      sudo cupsaccept HP_LaserJet_1320 2>/dev/null || true
+      sudo cupsenable HP_LaserJet_1320 2>/dev/null || true
+      echo -e "${GREEN}✅ Cola HP_LaserJet_1320 lista${NC}"
+    fi
+  fi
+
+  # --- 5. Share printers + LAN access in cupsd.conf ---
+  echo "🔧 Configurando acceso LAN en CUPS (${CUPS_LAN}:${CUPS_PORT})..."
+  sudo cupsctl --share-printers --no-remote-admin
+
+  local CUPSD_BACKUP
+  CUPSD_BACKUP="${CUPSD_CONF}.bak-$(date +%Y%m%d-%H%M%S)"
+  sudo cp "$CUPSD_CONF" "$CUPSD_BACKUP"
+  echo "   💾 Backup cupsd.conf: $CUPSD_BACKUP"
+
+  # Ensure CUPS listens on all interfaces (not just localhost)
+  if ! sudo grep -q "^Listen 0\.0\.0\.0:${CUPS_PORT}" "$CUPSD_CONF" 2>/dev/null; then
+    sudo sed -i "s|^Listen localhost:${CUPS_PORT}$|Listen 0.0.0.0:${CUPS_PORT}|" "$CUPSD_CONF"
+    # If the substitution didn't match (e.g. Port directive or different format), append
+    if ! sudo grep -q "^Listen 0\.0\.0\.0:${CUPS_PORT}" "$CUPSD_CONF" 2>/dev/null; then
+      echo "Listen 0.0.0.0:${CUPS_PORT}" | sudo tee -a "$CUPSD_CONF" > /dev/null
+    fi
+  fi
+
+  # Ensure Allow from LAN inside <Location /> and <Location /printers> (idempotent).
+  # Use a temp Python script to avoid stdin/sudo interaction issues with heredocs.
+  local PY_SCRIPT
+  PY_SCRIPT=$(mktemp /tmp/cups_allow_XXXXXX.py)
+  cat > "$PY_SCRIPT" << 'PYEOF'
+import sys, re
+
+conf_path, lan = sys.argv[1], sys.argv[2]
+allow_line = '  Allow from ' + lan
+
+with open(conf_path, 'r') as f:
+    content = f.read()
+
+def inject_allow(m):
+    block = m.group(0)
+    if 'Allow from ' + lan in block:
+        return block  # already present, leave untouched
+    return block[:-len('</Location>')] + allow_line + '\n</Location>'
+
+for loc in ['/', '/printers']:
+    pattern = re.compile(
+        r'<Location\s+' + re.escape(loc) + r'\s*>.*?</Location>',
+        re.DOTALL
+    )
+    content = pattern.sub(inject_allow, content)
+
+with open(conf_path, 'w') as f:
+    f.write(content)
+PYEOF
+  sudo python3 "$PY_SCRIPT" "$CUPSD_CONF" "$CUPS_LAN"
+  sudo rm -f "$PY_SCRIPT"
+
+  # Verify CUPS restarts correctly; restore backup on failure
+  set +e
+  sudo systemctl restart cups
+  CUPS_RC=$?
+  set -e
+
+  if [ $CUPS_RC -ne 0 ] || ! sudo systemctl is-active --quiet cups 2>/dev/null; then
+    echo -e "${RED}❌ CUPS no arrancó tras editar cupsd.conf; restaurando backup...${NC}"
+    sudo cp "$CUPSD_BACKUP" "$CUPSD_CONF"
+    sudo systemctl restart cups 2>/dev/null || true
+    echo -e "${YELLOW}⚠️  cupsd.conf restaurado. Verifica la configuración manualmente.${NC}"
+    return 1
+  fi
+  echo -e "${GREEN}✅ CUPS configurado y activo (LAN ${CUPS_LAN})${NC}"
+
+  # --- 6. Firewall rule for CUPS port (ufw silently ignores duplicate rules) ---
+  echo "🔥 Abriendo puerto ${CUPS_PORT}/tcp en firewall para LAN..."
+  if command -v ufw &> /dev/null; then
+    sudo ufw allow from "${CUPS_LAN}" to any port "${CUPS_PORT}" proto tcp
+    echo -e "${GREEN}✅ ufw: ${CUPS_PORT}/tcp abierto para ${CUPS_LAN}${NC}"
+  else
+    echo -e "${YELLOW}⚠️  ufw no encontrado; abre manualmente: sudo ufw allow from ${CUPS_LAN} to any port ${CUPS_PORT} proto tcp${NC}"
+  fi
+}
+
+# ============================================================
+# CUPS: mask cups-browsed + cups.path in server mode; skip in client mode.
+# cups.service and cups.socket are NOT masked here — setup_cups_hp (called
+# below after the usblp section) unmasks them and brings them up.
+# Masking cups-browsed prevents auto-discovery of raw printers by CUPS
+# (avoids the libusb detach race that broke the matricial printer).
 # ============================================================
 echo ""
 if [ "$MODE" = "server" ]; then
-  echo "🔒 Enmascarando CUPS (servidor: matricial usa usblp directo)..."
-  for svc in cups cups-browsed cups.socket cups.path; do
+  echo "🔒 Enmascarando cups-browsed y cups.path (cups.service/socket gestionados por setup_cups_hp)..."
+  for svc in cups-browsed cups.path; do
     sudo systemctl mask "$svc" 2>/dev/null || true
   done
-  echo -e "${GREEN}✅ CUPS enmascarado${NC}"
+  echo -e "${GREEN}✅ cups-browsed y cups.path enmascarados${NC}"
 else
   echo "ℹ️  Modo cliente: CUPS no necesario (usblp directo)"
 fi
@@ -295,6 +456,16 @@ if [ "$MODE" = "server" ]; then
     echo "usblp" | sudo tee "$USBLP_CONF" > /dev/null
   fi
   echo -e "${GREEN}✅ Módulo usblp asegurado${NC}"
+fi
+
+# ============================================================
+# CUPS + HP LaserJet 1320 (server mode only)
+# Reactivates cups.service+cups.socket (cups-browsed/cups.path stay masked)
+# and configures the HP queue + LAN access. If the HP is not connected,
+# logs a warning and continues without aborting the rest of the install.
+# ============================================================
+if [ "$MODE" = "server" ]; then
+  setup_cups_hp
 fi
 
 # ============================================================
@@ -509,8 +680,8 @@ else
   UNIT_HOST="localhost"
 fi
 
-# After= dependency: cups.service not needed in either mode
-# (client: usblp direct, no CUPS installed; server: CUPS is masked)
+# After= dependency: cups.service not needed in either mode.
+# thermal-print writes directly via usblp; it does not depend on CUPS.
 UNIT_AFTER="After=network.target"
 
 # Cert env vars for unit (server + domain)

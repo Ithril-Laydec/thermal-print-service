@@ -1,4 +1,5 @@
 const fs = require('fs')
+const net = require('net')
 const { execFile, execFileSync } = require('child_process')
 const path = require('path')
 const os = require('os')
@@ -23,7 +24,11 @@ function execFileAsync(file, args, options) {
 // Nombres de impresoras en Windows
 const WINDOWS_PRINTER_NAME = 'albaran'
 const WINDOWS_PRINTER_DIPLODOCUS = 'diplodocus'
-const WINDOWS_SATO_NAMES = ['SATO WS412', 'ETIQUETADORA', 'Etiquetas']
+
+// Impresora de etiquetas SATO WS412 — conexión directa por red (TCP/IP raw)
+// Si la SATO cambia de dirección IP o puerto, editar SOLO estas dos constantes:
+const SATO_HOST = '192.168.0.251'
+const SATO_PORT = 9100
 
 /**
  * Impresión directa con buffer binario ESC/POS
@@ -274,95 +279,60 @@ async function printWindowsToPrinter(buffer, printerName) {
 	}
 }
 
-// Caché de impresora SATO para evitar llamadas repetidas a wmic
-let cachedSatoPrinter = null
-
 /**
- * Busca la primera impresora disponible entre los nombres dados (Windows)
- * Usa execFileSync con wmic directamente (sin cmd.exe) para evitar timeouts
- * Cachea el resultado para evitar procesos zombie por timeouts
- */
-function findWindowsPrinter(names) {
-	// Retornar caché si existe
-	if (cachedSatoPrinter) {
-		return cachedSatoPrinter
-	}
-
-	try {
-		const result = execFileSync('wmic', ['printer', 'get', 'name'], {
-			encoding: 'utf8',
-			timeout: 10000,
-			windowsHide: true,
-		})
-		// wmic output: primera línea es "Name", resto son nombres con espacios trailing
-		const installed = result
-			.split('\n')
-			.slice(1)
-			.map((p) => p.trim())
-			.filter(Boolean)
-		const found = names.find((name) => installed.includes(name))
-		if (found) {
-			cachedSatoPrinter = found
-			console.log(`Impresora SATO cacheada: ${found}`)
-		}
-		return found
-	} catch (error) {
-		console.error('Error buscando impresoras:', error.message)
-		return null
-	}
-}
-
-/**
- * Impresión a SATO WS412 (etiquetas SBPL)
- * Usa CUPS en Linux, RawPrint en Windows
+ * Impresión a SATO WS412 (etiquetas SBPL) por socket TCP.
+ * La SATO es una impresora de red — no depende de plataforma ni de CUPS.
+ * Punto de entrada del endpoint /print-labels.
  */
 async function printToSato(buffer) {
-	const platform = process.platform
-
-	if (platform === 'win32') {
-		const printerName = findWindowsPrinter(WINDOWS_SATO_NAMES)
-		if (!printerName) {
-			throw new Error(
-				`No se encontró impresora SATO. Nombres buscados: ${WINDOWS_SATO_NAMES.join(', ')}`,
-			)
-		}
-		console.log(`Impresora SATO encontrada: ${printerName}`)
-		return printWindowsToPrinter(buffer, printerName)
-	} else {
-		return printLinuxToSato(buffer)
-	}
+	return printLinuxToSato(buffer)
 }
 
 /**
- * Impresión a SATO en Linux usando CUPS
+ * Envía el buffer SBPL a la SATO WS412 por socket TCP (red).
+ * Todas las plataformas usan este mismo camino — la SATO escucha en
+ * SATO_HOST:SATO_PORT con protocolo raw (sin spooler, sin CUPS).
  */
 async function printLinuxToSato(buffer) {
-	const tempFile = path.join(os.tmpdir(), `sato-${Date.now()}.bin`)
-	const cupsQueue = 'Albaranes'
+	return new Promise((resolve, reject) => {
+		const socket = net.createConnection({ host: SATO_HOST, port: SATO_PORT })
 
-	try {
-		fs.writeFileSync(tempFile, buffer)
-		console.log(
-			`Archivo temporal SATO: ${tempFile} (${buffer.length} bytes)`,
-		)
+		// Timeout de 10 s: si la SATO no responde, destruimos el socket con error
+		socket.setTimeout(10000)
 
-		execFileSync('lp', ['-d', cupsQueue, '-o', 'raw', tempFile], {
-			encoding: 'utf8',
-			timeout: 30000,
+		socket.on('connect', () => {
+			console.log(
+				`Conectado a SATO ${SATO_HOST}:${SATO_PORT} — enviando ${buffer.length} bytes`,
+			)
+			socket.write(buffer)
+			socket.end()
 		})
 
-		console.log(`✅ Impresión SATO en cola ${cupsQueue}`)
-		return cupsQueue
-	} catch (error) {
-		console.error('Error SATO:', error.message)
-		throw new Error(`Error imprimiendo en SATO: ${error.message}`)
-	} finally {
-		try {
-			if (fs.existsSync(tempFile)) {
-				fs.unlinkSync(tempFile)
+		socket.on('close', (hadError) => {
+			if (!hadError) {
+				console.log(`✅ Impresión SATO enviada a ${SATO_HOST}:${SATO_PORT}`)
+				resolve(`${SATO_HOST}:${SATO_PORT}`)
 			}
-		} catch (e) {}
-	}
+			// Si hadError=true, 'error' ya llamó a reject — no hacer nada más
+		})
+
+		socket.on('timeout', () => {
+			socket.destroy(
+				new Error(
+					`Timeout (10 s) conectando a SATO ${SATO_HOST}:${SATO_PORT} — verifica que la impresora esté encendida y en red`,
+				),
+			)
+		})
+
+		socket.on('error', (err) => {
+			console.error(`Error SATO: ${err.message}`)
+			reject(
+				new Error(
+					`Error imprimiendo en SATO (${SATO_HOST}:${SATO_PORT}): ${err.message}`,
+				),
+			)
+		})
+	})
 }
 
 module.exports = {

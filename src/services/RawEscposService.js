@@ -103,82 +103,47 @@ async function printWindows(buffer) {
 }
 
 /**
- * Impresión en Linux usando dispositivos /dev/usb/lp*
- * Resolución del dispositivo térmico (por prioridad):
- *   (a) /dev/printer/thermal  — symlink udev por VID:PID (STMicro 0483:5743)
- *   (b) primer /dev/usb/lp* que NO sea el dispositivo real de diplodocus
- *   (c) fallback: primer /dev/usb/lp* disponible (comportamiento original)
+ * Resuelve el dispositivo Linux para la impresora térmica.
+ *
+ * INVARIANTE DE SEGURIDAD: NUNCA devuelve un /dev/usb/lp* sin verificar identidad.
+ * Solo se acepta el symlink udev /dev/printer/thermal (VID:PID 0483:5743).
+ * Si el symlink no está disponible, lanza Error con mensaje accionable en lugar de
+ * adivinar entre candidatos — evita escribir ESC/POS a la HP LaserJet 1320 (lp2).
+ *
+ * @param {{ existsFn?: (path: string) => boolean }} opts - inyección de dependencias (para tests)
+ * @returns {string} ruta del dispositivo verificado
+ * @throws {Error} si no se puede resolver el dispositivo de forma segura
  */
-async function printLinux(buffer) {
+function resolveLinuxThermalDevice({ existsFn = fs.existsSync } = {}) {
 	const THERMAL_SYMLINK = '/dev/printer/thermal'
-	const DIPLODOCUS_SYMLINK = '/dev/printer/diplodocus'
-	const LP_DEVICES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/lp0']
 
-	let candidates = []
-
-	if (fs.existsSync(THERMAL_SYMLINK)) {
-		// (a) symlink udev térmico — identificación exacta por VID:PID
-		candidates = [THERMAL_SYMLINK]
-	} else {
-		// Resolver el dispositivo real de diplodocus para excluirlo
-		let diplodocusReal = null
-		if (fs.existsSync(DIPLODOCUS_SYMLINK)) {
-			try {
-				diplodocusReal = fs.realpathSync(DIPLODOCUS_SYMLINK)
-			} catch (e) {
-				// No se pudo resolver; no excluimos nada
-			}
-		}
-
-		// (b) primer lp* que no sea la matricial
-		const available = LP_DEVICES.filter((dev) => {
-			if (!fs.existsSync(dev)) return false
-			if (diplodocusReal !== null) {
-				try {
-					return fs.realpathSync(dev) !== diplodocusReal
-				} catch (e) {
-					return true
-				}
-			}
-			return true
-		})
-
-		if (available.length > 0) {
-			candidates = available
-		} else {
-			// (c) fallback: comportamiento original (ningún lp* descartable encontrado)
-			candidates = LP_DEVICES.filter((dev) => fs.existsSync(dev))
-		}
-	}
-
-	let lastError = null
-
-	for (const device of candidates) {
-		try {
-			// Verificar permisos
-			try {
-				fs.accessSync(device, fs.constants.W_OK)
-			} catch (err) {
-				lastError = `Sin permisos. Ejecuta: sudo chmod 666 ${device}`
-				console.log(`❌ ${lastError}`)
-				continue
-			}
-
-			// Escribir buffer directamente
-			fs.writeFileSync(device, buffer)
-
-			console.log(`✅ Impresión en ${device}`)
-			return device
-		} catch (error) {
-			lastError = error.message
-			continue
-		}
+	if (existsFn(THERMAL_SYMLINK)) {
+		return THERMAL_SYMLINK
 	}
 
 	throw new Error(
-		lastError ||
-			'No se pudo imprimir. Ejecuta: sudo chmod 666 /dev/usb/lp0',
+		'Impresora térmica no encontrada: falta /dev/printer/thermal. ' +
+		'Verifica conexión USB y ejecuta: sudo udevadm trigger',
 	)
+}
+
+/**
+ * Impresión en Linux usando el symlink udev verificado.
+ * Delega la resolución del device a resolveLinuxThermalDevice(), que garantiza
+ * que NUNCA se escribe a un device no identificado (p.ej. la HP LaserJet 1320).
+ */
+async function printLinux(buffer) {
+	const device = resolveLinuxThermalDevice()
+
+	try {
+		fs.accessSync(device, fs.constants.W_OK)
+	} catch (err) {
+		throw new Error(`Sin permisos en ${device}. Ejecuta: sudo chmod 666 ${device}`)
+	}
+
+	fs.writeFileSync(device, buffer)
+	console.log(`✅ Impresión en ${device}`)
+	return device
 }
 
 /**
@@ -339,4 +304,6 @@ module.exports = {
 	printWithRawBuffer,
 	printToDiplodocus,
 	printToSato,
+	// Exportado para tests unitarios y diagnóstico externo
+	resolveLinuxThermalDevice,
 }

@@ -10,10 +10,8 @@
     <keepFiles>3</keepFiles>
   </log>
   <startmode>Automatic</startmode>
-  <serviceaccount>
-    <username>NT AUTHORITY\NetworkService</username>
-    <allowservicelogon>true</allowservicelogon>
-  </serviceaccount>
+  <!-- Sin <serviceaccount>: WinSW usa LocalSystem. NetworkService no puede
+       reasignar el puerto de la cola "albaran" ni eliminar trabajos atascados. -->
   <onfailure action="restart" delay="10 sec"/>
   <onfailure action="restart" delay="20 sec"/>
   <onfailure action="none"/>

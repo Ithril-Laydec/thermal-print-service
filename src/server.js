@@ -11,6 +11,7 @@ const {
 	printLabels,
 } = require('./controllers/printController')
 const { PORT, HOST } = require('./config/config')
+const { ensureWindowsThermalQueue } = require('./services/windowsThermalQueue')
 
 // Keepalive: en Windows, previene que el OS page-out el proceso y el print spooler
 // tras períodos de inactividad (causa raíz del "hay que pulsar dos veces")
@@ -39,8 +40,17 @@ if (process.platform === 'win32') {
 			{ timeout: 5000, windowsHide: true },
 			() => {},
 		)
+		// Autocorrección: si la térmica se ha cambiado de toma USB, reasigna la
+		// cola antes de que alguien intente imprimir (y mantiene PowerShell en caché)
+		ensureWindowsThermalQueue().catch((error) => {
+			console.error(`⚠️  Keepalive: cola térmica no verificada: ${error.message}`)
+		})
 		console.log(`🔄 Keepalive: warm-up ejecutado`)
 	}, KEEPALIVE_INTERVAL)
+
+	ensureWindowsThermalQueue().catch((error) => {
+		console.error(`⚠️  Arranque: cola térmica no verificada: ${error.message}`)
+	})
 
 	console.log(
 		`⏰ Keepalive configurado: cada ${KEEPALIVE_INTERVAL / 60000} min`,

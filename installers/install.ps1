@@ -474,6 +474,30 @@ if ($service.Status -eq 'Running') {
     exit 1
 }
 
+# ============================================================
+# THERMAL QUEUE (albaran -> current USB port of the thermal printer)
+# ============================================================
+Write-Host ""
+Write-Host "🖨️  Verificando cola de la impresora térmica..." -ForegroundColor Yellow
+try {
+    $queueScript = Join-Path $INSTALL_DIR "installers\bin\print-thermal.ps1"
+    $queueJson = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $queueScript -PrinterName albaran
+    $queue = ($queueJson | Where-Object { $_ -like '{*' } | Select-Object -Last 1) | ConvertFrom-Json
+    if ($queue.ok) {
+        if ($queue.action -eq 'none') {
+            Write-Host "   ✅ Cola albaran correcta en $($queue.port)" -ForegroundColor Green
+        } else {
+            Write-Host "   ✅ Cola albaran corregida ($($queue.action)) en $($queue.port); $($queue.removedJobs) trabajos atascados eliminados" -ForegroundColor Green
+        }
+    } elseif ($queue.code -eq 'THERMAL_NOT_CONNECTED') {
+        Write-Host "   ℹ️  Térmica no conectada: la cola se configurará sola al conectarla" -ForegroundColor Gray
+    } else {
+        Write-Host "   ⚠️  Cola térmica no verificada: $($queue.code) $($queue.detail)" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "   ⚠️  No se pudo verificar la cola térmica: $_" -ForegroundColor Yellow
+}
+
 # Cleanup
 Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
 

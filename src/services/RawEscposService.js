@@ -21,8 +21,9 @@ function execFileAsync(file, args, options) {
 	})
 }
 
-// Nombres de impresoras en Windows
-const WINDOWS_PRINTER_NAME = 'albaran'
+const { printWindowsThermalFile } = require('./windowsThermalQueue')
+
+// Nombres de impresoras en Windows (la térmica `albaran` vive en windowsThermalQueue.js)
 const WINDOWS_PRINTER_DIPLODOCUS = 'diplodocus'
 
 // Impresora de etiquetas SATO WS412 — conexión directa por red (TCP/IP raw)
@@ -45,54 +46,34 @@ async function printWithRawBuffer(buffer) {
 }
 
 /**
- * Impresión en Windows usando RawPrint.exe (winspool.drv nativo)
- * - Usa execFile (async, sin cmd.exe) en lugar de execSync para evitar ETIMEDOUT tras idle
- * - Incluye retry automático: si la primera llamada falla (spooler frío), reintenta tras 1s
+ * Impresión térmica en Windows.
+ * - La cola `albaran` se reasigna sola al puerto USB actual de la térmica
+ *   (ver windowsThermalQueue.js), así que cambiar la térmica de toma USB no
+ *   deja los tickets atascados en el spooler.
+ * - Solo se confirma el éxito cuando el trabajo ha salido de la cola.
+ * - Un reintento si el spooler rechaza el trabajo (spooler frío tras idle).
  */
 async function printWindows(buffer) {
 	const tempFile = path.join(os.tmpdir(), `thermal-${Date.now()}.bin`)
-	const rawPrintExe = path.join(
-		__dirname,
-		'..',
-		'..',
-		'installers',
-		'bin',
-		'RawPrint.exe',
-	)
 	const MAX_RETRIES = 2
 
 	try {
 		fs.writeFileSync(tempFile, buffer)
 		console.log(`Archivo temporal: ${tempFile} (${buffer.length} bytes)`)
 
-		let lastError
-		for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+		for (let attempt = 1; ; attempt++) {
 			try {
-				const result = await execFileAsync(
-					rawPrintExe,
-					[WINDOWS_PRINTER_NAME, tempFile],
-					{
-						encoding: 'utf8',
-						timeout: 15000,
-						windowsHide: true,
-					},
-				)
-				console.log(
-					`Impresion en Windows (intento ${attempt}): ${result.trim()}`,
-				)
-				return WINDOWS_PRINTER_NAME
+				return await printWindowsThermalFile(tempFile)
 			} catch (error) {
-				lastError = error
 				console.error(
 					`Intento ${attempt}/${MAX_RETRIES} falló: ${error.message}`,
 				)
-				if (attempt < MAX_RETRIES) {
-					await new Promise((r) => setTimeout(r, 1000))
+				if (error.code !== 'RAWPRINT_FAILED' || attempt >= MAX_RETRIES) {
+					throw error
 				}
+				await new Promise((r) => setTimeout(r, 1000))
 			}
 		}
-
-		throw new Error(`Error imprimiendo en Windows: ${lastError.message}`)
 	} finally {
 		try {
 			if (fs.existsSync(tempFile)) {

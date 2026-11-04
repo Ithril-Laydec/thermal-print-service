@@ -258,10 +258,31 @@ Frontend (Vue HTTPS)
     ↓
 Thermal Print Service (Express + HTTPS + Keepalive)
     ↓
-    execFile → RawPrint.exe "nombre_impresora" buffer.bin (async, sin cmd.exe)
+    térmica:    execFile → powershell print-thermal.ps1 (cola albaran → puerto USB actual → RawPrint.exe → espera a que salga de la cola)
+    diplodocus: execFile → RawPrint.exe "diplodocus" buffer.bin (async, sin cmd.exe)
     ↓
-Impresora Windows (albaran, diplodocus, SATO WS412, etc.)
+Impresora Windows (albaran, diplodocus)
 ```
+
+**Térmica independiente del puerto USB:** Windows crea un puerto virtual nuevo
+(`USB003`, `USB005`...) cada vez que la térmica se conecta a otra toma USB, y la
+cola `albaran` se queda en el puerto antiguo y en modo "Usar impresora sin
+conexión": el spooler acepta los tickets pero no imprime nada.
+`installers/bin/print-thermal.ps1` lo corrige solo, en cada impresión, al
+arrancar el servicio, cada 5 minutos (keepalive) y al instalar:
+
+1. Identifica la térmica por el VID/PID USB del dispositivo padre (lista
+   blanca: `0483:5743` y `0FE6:811E`), nunca por número de puerto, así que
+   nunca reasigna la cola a la HP ni a la EPSON.
+2. Si la cola no existe la crea (`Generic / Text Only`); si apunta a otro
+   puerto o está sin conexión, elimina los trabajos retenidos (nunca se
+   imprimieron y saldrían todos de golpe) y la corrige. Si ya está bien, no toca nada.
+3. Tras enviar el ticket espera (máx. 30 s) a que salga de la cola. Si no sale
+   (sin papel, tapa abierta, apagada) lo cancela y devuelve error al
+   frontend, en lugar de responder "OK" con el ticket atascado.
+
+El servicio corre como `LocalSystem` porque `NetworkService` no puede cambiar el
+puerto de una cola ni eliminar trabajos.
 
 **Por qué RawPrint.exe:** Windows no permite escribir directamente a dispositivos USB. RawPrint.exe usa la API nativa `winspool.drv` para enviar datos RAW a cualquier impresora compartida.
 
@@ -337,8 +358,10 @@ irm https://github.com/Ithril-Laydec/thermal-print-service/raw/master/installers
 
 ### Oficina - Windows de Jesús
 
+IP dinámica: localízala por NetBIOS (`JESUS`) y conecta con usuario explícito:
+
 ```bash
-ssh Usuario@192.168.0.17
+ssh -l "jesús" <ip>
 ```
 
 ## Licencia

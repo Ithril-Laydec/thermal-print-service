@@ -49,23 +49,32 @@ $ServiceRunning = $false
 $IsUpdate = $false
 $CurrentVersion = "desconocida"
 
+# Query the local service. Windows PowerShell 5 has no -SkipCertificateCheck
+# and the service uses a mkcert certificate, so use the bundled curl.exe with
+# -k (Windows 10+). Returns the parsed JSON and its protocol, or $null.
+function Invoke-LocalService([string]$Endpoint, [int]$TimeoutSec = 3) {
+    foreach ($protocol in @('https', 'http')) {
+        try {
+            $body = & curl.exe -sk -m $TimeoutSec "${protocol}://localhost:20936$Endpoint" 2>$null
+            if ($LASTEXITCODE -eq 0 -and $body) {
+                return [pscustomobject]@{ Protocol = $protocol.ToUpper(); Data = ($body | ConvertFrom-Json) }
+            }
+        } catch {}
+    }
+    return $null
+}
+
 # Function to get installed version
 function Get-InstalledVersion {
-    try {
-        $response = Invoke-RestMethod -Uri "https://localhost:20936/version" -Method Get -TimeoutSec 2 -SkipCertificateCheck
-        return $response.version
-    } catch {
-        try {
-            $response = Invoke-RestMethod -Uri "http://localhost:20936/version" -Method Get -TimeoutSec 2
-            return $response.version
-        } catch {
-            if (Test-Path "$INSTALL_DIR\package.json") {
-                $packageJson = Get-Content "$INSTALL_DIR\package.json" | ConvertFrom-Json
-                return $packageJson.version
-            }
-            return "desconocida"
-        }
+    $response = Invoke-LocalService "/version"
+    if ($response -and $response.Data.version) {
+        return $response.Data.version
     }
+    if (Test-Path "$INSTALL_DIR\package.json") {
+        $packageJson = Get-Content "$INSTALL_DIR\package.json" | ConvertFrom-Json
+        return $packageJson.version
+    }
+    return "desconocida"
 }
 
 # ============================================================
@@ -73,20 +82,11 @@ function Get-InstalledVersion {
 # ============================================================
 Write-Host "🔍 Analizando estado del sistema..." -ForegroundColor Yellow
 
-try {
-    $response = Invoke-RestMethod -Uri "https://localhost:20936/health" -Method Get -TimeoutSec 2 -SkipCertificateCheck
+$health = Invoke-LocalService "/health"
+if ($health) {
     $ServiceRunning = $true
     $CurrentVersion = Get-InstalledVersion
-    Write-Host "✅ Servicio detectado (HTTPS) - v$CurrentVersion" -ForegroundColor Green
-} catch {
-    try {
-        $response = Invoke-RestMethod -Uri "http://localhost:20936/health" -Method Get -TimeoutSec 2
-        $ServiceRunning = $true
-        $CurrentVersion = Get-InstalledVersion
-        Write-Host "✅ Servicio detectado (HTTP) - v$CurrentVersion" -ForegroundColor Green
-    } catch {
-        # Service not running
-    }
+    Write-Host "✅ Servicio detectado ($($health.Protocol)) - v$CurrentVersion" -ForegroundColor Green
 }
 
 $existingService = Get-Service -Name $SERVICE_NAME -ErrorAction SilentlyContinue
@@ -431,21 +431,22 @@ Write-Host ""
 Write-Host "🔍 Verificando..." -ForegroundColor Yellow
 $service = Get-Service -Name $SERVICE_NAME
 if ($service.Status -eq 'Running') {
-    $NewVersion = Get-InstalledVersion
-
-    try {
-        $response = Invoke-RestMethod -Uri "https://localhost:20936/health" -Method Get -SkipCertificateCheck
+    # The service can take a few seconds to bind after Start-Service.
+    $health = $null
+    for ($i = 0; $i -lt 10 -and -not $health; $i++) {
+        $health = Invoke-LocalService "/health"
+        if (-not $health) { Start-Sleep -Seconds 1 }
+    }
+    if ($health -and $health.Protocol -eq 'HTTPS') {
         Write-Host "✅ Servicio funcionando (HTTPS)" -ForegroundColor Green
         Write-Host "   🔒 Certificados SSL configurados" -ForegroundColor Gray
-    } catch {
-        try {
-            $response = Invoke-RestMethod -Uri "http://localhost:20936/health" -Method Get
-            Write-Host "✅ Servicio funcionando (HTTP)" -ForegroundColor Green
-            Write-Host "   ⚠️  Sin HTTPS" -ForegroundColor Yellow
-        } catch {
-            Write-Host "⚠️  No se pudo verificar el servicio" -ForegroundColor Yellow
-        }
+    } elseif ($health) {
+        Write-Host "✅ Servicio funcionando (HTTP)" -ForegroundColor Green
+        Write-Host "   ⚠️  Sin HTTPS" -ForegroundColor Yellow
+    } else {
+        Write-Host "⚠️  El servicio está iniciado pero no responde en localhost:20936" -ForegroundColor Yellow
     }
+    $NewVersion = Get-InstalledVersion
 
     if ($IsUpdate) {
         Write-Host "   📦 Versión anterior: $CurrentVersion" -ForegroundColor Gray

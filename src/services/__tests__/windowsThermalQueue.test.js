@@ -1,112 +1,103 @@
 /**
- * Behavior of the Windows thermal queue guard (Node side).
- *
- * The PowerShell script reports one JSON line; Node must only report success
- * when the script confirms delivery, and must never run two thermal jobs at
- * once (the script's drain check would treat the other job as stuck).
+ * Behavior of the background Windows thermal queue maintenance.
  *
  * Run: node --test src/services/__tests__/windowsThermalQueue.test.js
  */
 
 'use strict'
 
-const { describe, it } = require('node:test')
+const { describe, it, mock } = require('node:test')
 const assert = require('node:assert/strict')
 const {
-	interpretThermalScriptOutput,
-	createSerialQueue,
+	parseMaintenanceOutput,
+	createMaintenanceScheduler,
 } = require('../windowsThermalQueue')
 
-function scriptLine(fields) {
-	return JSON.stringify({
-		ok: false,
-		code: '',
-		printer: 'albaran',
-		port: '',
-		action: 'none',
-		previousPort: '',
-		removedJobs: 0,
-		detail: '',
-		...fields,
+function deferred() {
+	let resolve
+	const promise = new Promise((r) => {
+		resolve = r
 	})
+	return { promise, resolve }
 }
 
-describe('interpretThermalScriptOutput', () => {
-	it('returns the repaired queue when the script repointed it and printed', () => {
-		const outcome = interpretThermalScriptOutput(
-			scriptLine({
-				ok: true,
-				port: 'USB005',
-				action: 'repointed',
-				previousPort: 'USB003',
-				removedJobs: 22,
-			}),
+describe('parseMaintenanceOutput', () => {
+	it('reads the JSON result after any noise lines', () => {
+		const outcome = parseMaintenanceOutput(
+			'warning\r\n{"ok":true,"port":"USB005","action":"repointed","previousPort":"USB003","removedJobs":22}\r\n',
 		)
-		assert.deepEqual(outcome, {
-			printer: 'albaran',
-			port: 'USB005',
-			action: 'repointed',
-			previousPort: 'USB003',
-			removedJobs: 22,
-		})
+		assert.equal(outcome.ok, true)
+		assert.equal(outcome.port, 'USB005')
+		assert.equal(outcome.removedJobs, 22)
 	})
 
-	it('ignores noise printed before the JSON line', () => {
-		const stdout = `warning line\r\n${scriptLine({ ok: true, port: 'USB001' })}\r\n`
-		assert.equal(interpretThermalScriptOutput(stdout).port, 'USB001')
-	})
-
-	for (const code of [
-		'THERMAL_NOT_CONNECTED',
-		'THERMAL_AMBIGUOUS',
-		'PORT_MISSING',
-		'RAWPRINT_FAILED',
-		'NOT_PRINTED',
-		'SCRIPT_ERROR',
-	]) {
-		it(`fails with code ${code} instead of reporting a print`, () => {
-			assert.throws(
-				() => interpretThermalScriptOutput(scriptLine({ code })),
-				(error) => error.code === code,
-			)
-		})
-	}
-
-	it('fails when the script output is not a JSON result', () => {
-		assert.throws(() => interpretThermalScriptOutput('Access denied'))
+	it('fails when the output contains no JSON result', () => {
+		assert.throws(() => parseMaintenanceOutput('Access denied'))
 	})
 })
 
-describe('createSerialQueue', () => {
-	it('runs tasks one at a time in submission order', async () => {
-		const serialize = createSerialQueue()
-		const events = []
-		const task = (name, ms) => () =>
-			new Promise((resolve) => {
-				events.push(`start ${name}`)
-				setTimeout(() => {
-					events.push(`end ${name}`)
-					resolve(name)
-				}, ms)
-			})
+describe('createMaintenanceScheduler', () => {
+	it('collapses requests made during a pass into one follow-up pass', async () => {
+		const gate = deferred()
+		let runs = 0
+		const scheduler = createMaintenanceScheduler({
+			delayMs: 1000,
+			run: async () => {
+				runs++
+				if (runs === 1) await gate.promise
+			},
+		})
 
-		const results = await Promise.all([
-			serialize(task('a', 20)),
-			serialize(task('b', 1)),
-		])
+		const first = scheduler.now()
+		scheduler.now()
+		scheduler.now()
+		gate.resolve()
+		await first
 
-		assert.deepEqual(results, ['a', 'b'])
-		assert.deepEqual(events, ['start a', 'end a', 'start b', 'end b'])
+		assert.equal(runs, 2)
 	})
 
-	it('keeps running later tasks after one fails', async () => {
-		const serialize = createSerialQueue()
-		const failed = serialize(async () => {
-			throw new Error('paper out')
+	it('keeps serving requests after a failed pass', async () => {
+		const errors = []
+		let runs = 0
+		const scheduler = createMaintenanceScheduler({
+			delayMs: 1000,
+			onError: (error) => errors.push(error),
+			run: async () => {
+				runs++
+				if (runs === 1) throw new Error('powershell timeout')
+			},
 		})
-		const next = serialize(async () => 'printed')
 
-		await assert.rejects(failed)
-		assert.equal(await next, 'printed')
+		await scheduler.now()
+		await scheduler.now()
+
+		assert.equal(errors.length, 1)
+		assert.equal(runs, 2)
+	})
+
+	it('runs a single delayed pass after a burst of later() requests', async () => {
+		mock.timers.enable({ apis: ['setTimeout'] })
+		try {
+			let runs = 0
+			const scheduler = createMaintenanceScheduler({
+				delayMs: 1000,
+				run: async () => {
+					runs++
+				},
+			})
+
+			scheduler.later()
+			mock.timers.tick(600)
+			scheduler.later()
+			mock.timers.tick(600)
+			assert.equal(runs, 0)
+
+			mock.timers.tick(400)
+			await Promise.resolve()
+			assert.equal(runs, 1)
+		} finally {
+			mock.timers.reset()
+		}
 	})
 })

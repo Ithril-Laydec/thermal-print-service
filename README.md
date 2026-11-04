@@ -258,31 +258,39 @@ Frontend (Vue HTTPS)
     ↓
 Thermal Print Service (Express + HTTPS + Keepalive)
     ↓
-    térmica:    execFile → powershell print-thermal.ps1 (cola albaran → puerto USB actual → RawPrint.exe → espera a que salga de la cola)
-    diplodocus: execFile → RawPrint.exe "diplodocus" buffer.bin (async, sin cmd.exe)
+    térmica y diplodocus: execFile → RawPrint.exe "cola" buffer.bin (async, sin cmd.exe)
     ↓
 Impresora Windows (albaran, diplodocus)
 ```
 
-**Térmica independiente del puerto USB:** Windows crea un puerto virtual nuevo
-(`USB003`, `USB005`...) cada vez que la térmica se conecta a otra toma USB, y la
-cola `albaran` se queda en el puerto antiguo y en modo "Usar impresora sin
-conexión": el spooler acepta los tickets pero no imprime nada.
-`installers/bin/print-thermal.ps1` lo corrige solo, en cada impresión, al
-arrancar el servicio, cada 5 minutos (keepalive) y al instalar:
+**Velocidad primero, reparación en segundo plano.** El ticket se envía directo
+a la cola y el servicio responde en cuanto el spooler lo acepta. Nada en el
+camino de impresión espera a PowerShell, a la búsqueda USB ni a la impresión
+física. Después de cada impresión (vaya bien o mal), al arrancar y cada 5
+minutos, `installers/bin/print-thermal.ps1` repara la cola `albaran` en segundo
+plano. Las pasadas nunca se solapan y las peticiones seguidas se agrupan:
 
 1. Identifica la térmica por el VID/PID USB del dispositivo padre (lista
    blanca: `0483:5743` y `0FE6:811E`), nunca por número de puerto, así que
    nunca reasigna la cola a la HP ni a la EPSON.
-2. Si la cola no existe la crea (`Generic / Text Only`); si apunta a otro
-   puerto o está sin conexión, elimina los trabajos retenidos (nunca se
-   imprimieron y saldrían todos de golpe) y la corrige. Si ya está bien, no toca nada.
-3. Tras enviar el ticket espera (máx. 30 s) a que salga de la cola. Si no sale
-   (sin papel, tapa abierta, apagada) lo cancela y devuelve error al
-   frontend, en lugar de responder "OK" con el ticket atascado.
+2. Si la cola no existe la crea (`Generic / Text Only`). Si apunta a otro
+   puerto (la térmica se ha cambiado de toma USB) o está en "Usar impresora sin
+   conexión", elimina los trabajos retenidos (nunca se imprimieron y saldrían
+   todos de golpe) y la corrige. Si ya está bien, no toca nada.
+3. 65 s después de una impresión elimina los trabajos que llevan más de 60 s en
+   cola (sin papel, tapa abierta, apagada) para que no salgan más tarde.
+
+Consecuencia aceptada: tras cambiar la térmica de toma, el primer ticket se
+pierde y el segundo clic ya imprime.
 
 El servicio corre como `LocalSystem` porque `NetworkService` no puede cambiar el
 puerto de una cola ni eliminar trabajos.
+
+**SATO (todas las plataformas):** los trabajos se envían de uno en uno, en
+orden, por TCP. Con la cola libre, `/print-labels` responde en cuanto abre la
+conexión (si la SATO no es accesible, sigue devolviendo error). Si hay un envío
+en curso, el trabajo queda en cola y responde al momento. Los fallos posteriores
+solo quedan en el log.
 
 **Por qué RawPrint.exe:** Windows no permite escribir directamente a dispositivos USB. RawPrint.exe usa la API nativa `winspool.drv` para enviar datos RAW a cualquier impresora compartida.
 

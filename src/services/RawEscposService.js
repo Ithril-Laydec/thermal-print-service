@@ -1,8 +1,8 @@
 const fs = require('fs')
-const net = require('net')
-const { execFile, execFileSync } = require('child_process')
+const { execFile } = require('child_process')
 const path = require('path')
 const os = require('os')
+const crypto = require('crypto')
 
 /**
  * Wrapper async de execFile para evitar execSync (que bloquea el event loop)
@@ -21,9 +21,13 @@ function execFileAsync(file, args, options) {
 	})
 }
 
-const { printWindowsThermalFile } = require('./windowsThermalQueue')
+const {
+	WINDOWS_THERMAL_PRINTER,
+	scheduleThermalMaintenanceAfterPrint,
+} = require('./windowsThermalQueue')
+const { createSatoSender } = require('./satoSender')
 
-// Nombres de impresoras en Windows (la térmica `albaran` vive en windowsThermalQueue.js)
+// Nombres de impresoras en Windows
 const WINDOWS_PRINTER_DIPLODOCUS = 'diplodocus'
 
 // Impresora de etiquetas SATO WS412 — conexión directa por red (TCP/IP raw)
@@ -46,40 +50,17 @@ async function printWithRawBuffer(buffer) {
 }
 
 /**
- * Impresión térmica en Windows.
- * - La cola `albaran` se reasigna sola al puerto USB actual de la térmica
- *   (ver windowsThermalQueue.js), así que cambiar la térmica de toma USB no
- *   deja los tickets atascados en el spooler.
- * - Solo se confirma el éxito cuando el trabajo ha salido de la cola.
- * - Un reintento si el spooler rechaza el trabajo (spooler frío tras idle).
+ * Impresión térmica en Windows: camino rápido.
+ * Envía el ticket directamente a la cola `albaran` (mismo camino que la
+ * diplodocus) y responde en cuanto el spooler lo acepta. El mantenimiento de la
+ * cola (puerto USB, modo sin conexión, trabajos atascados) se ejecuta después en
+ * segundo plano, haya ido bien o mal, para que un segundo clic ya imprima.
  */
 async function printWindows(buffer) {
-	const tempFile = path.join(os.tmpdir(), `thermal-${Date.now()}.bin`)
-	const MAX_RETRIES = 2
-
 	try {
-		fs.writeFileSync(tempFile, buffer)
-		console.log(`Archivo temporal: ${tempFile} (${buffer.length} bytes)`)
-
-		for (let attempt = 1; ; attempt++) {
-			try {
-				return await printWindowsThermalFile(tempFile)
-			} catch (error) {
-				console.error(
-					`Intento ${attempt}/${MAX_RETRIES} falló: ${error.message}`,
-				)
-				if (error.code !== 'RAWPRINT_FAILED' || attempt >= MAX_RETRIES) {
-					throw error
-				}
-				await new Promise((r) => setTimeout(r, 1000))
-			}
-		}
+		return await printWindowsToPrinter(buffer, WINDOWS_THERMAL_PRINTER)
 	} finally {
-		try {
-			if (fs.existsSync(tempFile)) {
-				fs.unlinkSync(tempFile)
-			}
-		} catch (e) {}
+		scheduleThermalMaintenanceAfterPrint()
 	}
 }
 
@@ -171,7 +152,10 @@ async function printLinuxToDiplodocus(buffer) {
  * - Usa execFile (async, sin cmd.exe) con retry automático
  */
 async function printWindowsToPrinter(buffer, printerName) {
-	const tempFile = path.join(os.tmpdir(), `print-${Date.now()}.bin`)
+	const tempFile = path.join(
+		os.tmpdir(),
+		`print-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.bin`,
+	)
 	const rawPrintExe = path.join(
 		__dirname,
 		'..',
@@ -225,60 +209,16 @@ async function printWindowsToPrinter(buffer, printerName) {
 	}
 }
 
+const satoSender = createSatoSender({ host: SATO_HOST, port: SATO_PORT })
+
 /**
  * Impresión a SATO WS412 (etiquetas SBPL) por socket TCP.
  * La SATO es una impresora de red — no depende de plataforma ni de CUPS.
- * Punto de entrada del endpoint /print-labels.
+ * Punto de entrada del endpoint /print-labels. Responde en cuanto el trabajo
+ * está aceptado, sin esperar a que la SATO lo reciba entero (ver satoSender.js).
  */
 async function printToSato(buffer) {
-	return printLinuxToSato(buffer)
-}
-
-/**
- * Envía el buffer SBPL a la SATO WS412 por socket TCP (red).
- * Todas las plataformas usan este mismo camino — la SATO escucha en
- * SATO_HOST:SATO_PORT con protocolo raw (sin spooler, sin CUPS).
- */
-async function printLinuxToSato(buffer) {
-	return new Promise((resolve, reject) => {
-		const socket = net.createConnection({ host: SATO_HOST, port: SATO_PORT })
-
-		// Timeout de 10 s: si la SATO no responde, destruimos el socket con error
-		socket.setTimeout(10000)
-
-		socket.on('connect', () => {
-			console.log(
-				`Conectado a SATO ${SATO_HOST}:${SATO_PORT} — enviando ${buffer.length} bytes`,
-			)
-			socket.write(buffer)
-			socket.end()
-		})
-
-		socket.on('close', (hadError) => {
-			if (!hadError) {
-				console.log(`✅ Impresión SATO enviada a ${SATO_HOST}:${SATO_PORT}`)
-				resolve(`${SATO_HOST}:${SATO_PORT}`)
-			}
-			// Si hadError=true, 'error' ya llamó a reject — no hacer nada más
-		})
-
-		socket.on('timeout', () => {
-			socket.destroy(
-				new Error(
-					`Timeout (10 s) conectando a SATO ${SATO_HOST}:${SATO_PORT} — verifica que la impresora esté encendida y en red`,
-				),
-			)
-		})
-
-		socket.on('error', (err) => {
-			console.error(`Error SATO: ${err.message}`)
-			reject(
-				new Error(
-					`Error imprimiendo en SATO (${SATO_HOST}:${SATO_PORT}): ${err.message}`,
-				),
-			)
-		})
-	})
+	return satoSender.send(buffer)
 }
 
 module.exports = {

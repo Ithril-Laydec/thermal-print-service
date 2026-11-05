@@ -528,6 +528,9 @@ sudo tee $UDEV_RULES_FILE > /dev/null <<'UDEVRULES'
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0005", SYMLINK+="printer/diplodocus", MODE="0666", GROUP="lp"
 # STMicro térmica (tickets/albaranes) - 0483:5743
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5743", SYMLINK+="printer/thermal", MODE="0666", GROUP="lp"
+# Térmica antigua "80Series2" (tickets/albaranes) - 0fe6:811e
+# Misma lista blanca que print-thermal.ps1 en Windows. Conecta solo una térmica.
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0fe6", ATTRS{idProduct}=="811e", SYMLINK+="printer/thermal", MODE="0666", GROUP="lp"
 UDEVRULES
 
 sudo udevadm control --reload-rules

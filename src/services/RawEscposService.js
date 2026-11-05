@@ -68,7 +68,7 @@ async function printWindows(buffer) {
  * Resuelve el dispositivo Linux para la impresora térmica.
  *
  * INVARIANTE DE SEGURIDAD: NUNCA devuelve un /dev/usb/lp* sin verificar identidad.
- * Solo se acepta el symlink udev /dev/printer/thermal (VID:PID 0483:5743).
+ * Solo se acepta el symlink udev /dev/printer/thermal (VID:PID 0483:5743 o 0fe6:811e).
  * Si el symlink no está disponible, lanza Error con mensaje accionable en lugar de
  * adivinar entre candidatos — evita escribir ESC/POS a la HP LaserJet 1320 (lp2).
  *

@@ -74,9 +74,14 @@ curl -fsSL .../install.sh | bash -s -- --server --domain print.tu-dominio.com
 
 ✨ Qué hace adicionalmente:
 - ✅ HOST=0.0.0.0 en el unit systemd
-- ✅ Enmascara CUPS (`cups`, `cups-browsed`, `cups.socket`, `cups.path`) — CUPS reclama la
-  impresora matricial EPSON por libusb y desvincula `usblp` haciendo desaparecer
-  `/dev/usb/lp0`. Con CUPS enmascarado y `usblp` activo, `/dev/printer/diplodocus` queda estable
+- ✅ Mantiene CUPS solo para la HP (`hp://`): enmascara `cups-browsed` y `cups.path`,
+  elimina toda cola `usb://` y desactiva la autoconfiguración de `system-config-printer-udev`
+  (override vacío en `/etc/udev/rules.d/70-printers.rules` y `configure-printer@.service`
+  enmascarado). Esa autoconfiguración creaba colas `usb://` en cada arranque e imprimía una
+  página de prueba que desvinculaba `usblp` de la matricial EPSON, haciendo desaparecer
+  `/dev/printer/diplodocus` hasta reconectar el USB
+- ✅ Reengancha `usblp` en las interfaces de impresora USB que hayan quedado sin driver y
+  verifica al final que no quedan colas `usb://` y que existen los enlaces `/dev/printer/*`
 - ✅ Asegura el módulo `usblp` (cargado y persistente en `/etc/modules-load.d/`)
 - ✅ Instala `curl` si no está presente
 - ✅ Configura UFW: detecta el puerto real de sshd (no asume 22) y lo permite antes de habilitar

@@ -435,6 +435,20 @@ if [ "$MODE" = "server" ]; then
     sudo systemctl mask "$svc" 2>/dev/null || true
   done
   echo -e "${GREEN}✅ cups-browsed y cups.path enmascarados${NC}"
+
+  # system-config-printer-udev runs configure-printer@<usb-bus-dev>.service
+  # whenever a USB printer appears (including at every boot). It creates a
+  # usb:// queue and prints a test page, and that job detaches usblp from the
+  # matricial printer until it is physically replugged. Neutralise both the
+  # udev trigger (an /etc override of 70-printers.rules wins over /usr/lib) and
+  # the systemd template, so it stays off even if the package is reinstalled.
+  echo "🔒 Desactivando la autoconfiguración de impresoras USB (system-config-printer-udev)..."
+  sudo tee /etc/udev/rules.d/70-printers.rules > /dev/null <<'NOAUTOCONF'
+# Thermal Print Service: disables system-config-printer-udev auto-configuration.
+# Its usb:// queues detach usblp and remove /dev/printer/diplodocus.
+NOAUTOCONF
+  sudo systemctl mask configure-printer@.service > /dev/null 2>&1 || true
+  echo -e "${GREEN}✅ Autoconfiguración de impresoras USB desactivada${NC}"
 else
   echo "ℹ️  Modo cliente: CUPS no necesario (usblp directo)"
 fi
@@ -534,19 +548,21 @@ SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0fe6", ATTRS{idProduct}=="811e", SYMLINK
 UDEVRULES
 
 sudo udevadm control --reload-rules
-sudo udevadm trigger
-echo -e "${GREEN}✅ Reglas udev configuradas${NC}"
 
-# Create symlink immediately if device is connected
-if [ -e /dev/usb/lp0 ]; then
-    VENDOR=$(cat /sys/class/usbmisc/lp0/device/uevent 2>/dev/null | grep PRODUCT | cut -d= -f2 | cut -d/ -f1)
-    if [ "$VENDOR" = "4b8" ]; then
-        sudo mkdir -p /dev/printer
-        sudo ln -sf /dev/usb/lp0 /dev/printer/diplodocus
-        sudo chmod 666 /dev/printer/diplodocus
-        echo -e "${GREEN}✅ Symlink /dev/printer/diplodocus creado${NC}"
-    fi
-fi
+# Reattach usblp to printer interfaces that a previous libusb job left without
+# a driver (class 07, excluding IPP-over-USB protocol 04). This restores the
+# raw devices without replugging; udev then recreates the /dev/printer links.
+for IFACE in /sys/bus/usb/devices/*:*; do
+  [ "$(cat "$IFACE/bInterfaceClass" 2>/dev/null)" = "07" ] || continue
+  [ "$(cat "$IFACE/bInterfaceProtocol" 2>/dev/null)" != "04" ] || continue
+  [ -e "$IFACE/driver" ] && continue
+  echo "   🔌 Reenganchando usblp en $(basename "$IFACE")"
+  echo "$(basename "$IFACE")" | sudo tee /sys/bus/usb/drivers/usblp/bind > /dev/null 2>&1 || true
+done
+
+sudo udevadm trigger --subsystem-match=usbmisc --action=add
+sudo udevadm settle
+echo -e "${GREEN}✅ Reglas udev configuradas${NC}"
 
 # ============================================================
 # BACKUP (if updating)
@@ -821,6 +837,22 @@ if sudo systemctl is-active --quiet thermal-print.service; then
         echo "   📦 Versión nueva: $NEW_VERSION"
     else
         echo "   📦 Versión: $NEW_VERSION"
+    fi
+
+    if [ "$MODE" = "server" ]; then
+        REMAINING_USB_QUEUES=$(lpstat -v 2>/dev/null | awk '$NF ~ /^usb:\/\//{gsub(/:$/,"", $3); print $3}')
+        if [ -n "$REMAINING_USB_QUEUES" ]; then
+            echo -e "${RED}❌ Siguen existiendo colas usb://: $REMAINING_USB_QUEUES${NC}"
+        else
+            echo -e "${GREEN}✅ Sin colas usb:// en CUPS${NC}"
+        fi
+        for LINK in diplodocus thermal; do
+            if [ -e "/dev/printer/$LINK" ]; then
+                echo -e "${GREEN}✅ /dev/printer/$LINK -> $(readlink "/dev/printer/$LINK")${NC}"
+            else
+                echo -e "${YELLOW}⚠️  Falta /dev/printer/$LINK: verifica que la impresora esté conectada y encendida${NC}"
+            fi
+        done
     fi
 else
     echo -e "${RED}❌ El servicio no se inició correctamente${NC}"
